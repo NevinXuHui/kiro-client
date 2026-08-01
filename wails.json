@@ -1,0 +1,21 @@
+{
+  "name": "kiro-client",
+  "version": "v0.0.0",
+  "build": {
+    "windows": {
+      "icon": "frontend/assets/appicon.ico",
+      "startup": true,
+      "autostart": false
+    },
+    "darwin": {
+      "icon": "frontend/assets/appicon_512.png"
+    },
+    "linux": {
+      "depmethods": ["appimage"]
+    }
+  },
+  "frontend:dev:serverUrl": "auto",
+  "frontend:build:dir": "frontend/dist",
+  "frontend:install": "npm install",
+  "frontend:build": "node build.js"
+}

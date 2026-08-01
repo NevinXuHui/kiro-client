@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Kiro Client</title>
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/animate.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <!-- Inter 字体 -->
+  <style>
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 400;
+      font-display: swap;
+      src: url('assets/fonts/Inter-Regular.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 500;
+      font-display: swap;
+      src: url('assets/fonts/Inter-Medium.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 600;
+      font-display: swap;
+      src: url('assets/fonts/Inter-SemiBold.woff2') format('woff2');
+    }
+    @font-face {
+      font-family: 'Inter';
+      font-style: normal;
+      font-weight: 700;
+      font-display: swap;
+      src: url('assets/fonts/Inter-Bold.woff2') format('woff2');
+    }
+  </style>
+  <!-- 初始主题色（防止闪白） -->
+  <style>
+    html { background: #ffffff; }
+    /* 加载骨架 */
+    #skeleton-loader {
+      position: fixed; inset: 0; z-index: 9999;
+      background: linear-gradient(135deg, #ebf1fd 0%, #e4ecfa 45%, #dde7f8 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 17px; color: #2f80f5;
+    }
+    #skeleton-loader::after {
+      content: 'Kiro Client';
+      font-weight: 700; letter-spacing: 3px; color: #2f80f5;
+    }
+    #main-container { display: none; }
+  </style>
+</head>
+<body>
+  <!-- 骨架屏 -->
+  <div id="skeleton-loader"></div>
+
+  <!-- ===== 主容器 ===== -->
+  <div id="main-container">
+
+    <!-- ===== Win11 标题栏 ===== -->
+    <div class="mac-titlebar">
+      <span class="mac-titlebar-text" id="titlebar-text">主页</span>
+    </div>
+
+    <!-- ===== 主体 ===== -->
+    <div class="mac-body">
+      <!-- ===== 侧边栏 ===== -->
+      <div class="sidebar">
+        <div class="sidebar-logo" onclick="switchPage('overview')">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/>
+            <line x1="12" y1="22" x2="12" y2="15.5"/>
+            <polyline points="22 8.5 12 15.5 2 8.5"/>
+          </svg>
+          <span>Kiro Client</span>
+        </div>
+        <div class="sidebar-nav">
+          <!-- 概览 -->
+          <div class="nav-item active" data-page="overview" onclick="switchPage('overview')" title="主页">
+            <i data-lucide="layout-grid"></i>
+            <span class="nav-label" data-i18n="nav.overview">主页</span>
+          </div>
+          <!-- 总日志 -->
+          <div class="nav-item" data-page="masterlog" onclick="switchPage('masterlog')" title="总日志">
+            <i data-lucide="scroll-text"></i>
+            <span class="nav-label" data-i18n="nav.masterlog">总日志</span>
+          </div>
+          <!-- 注册 -->
+          <div class="nav-item" data-page="register" onclick="switchPage('register')" title="注册机">
+            <i data-lucide="user-plus"></i>
+            <span class="nav-label" data-i18n="nav.register">注册机</span>
+          </div>
+          <!-- 邮箱池 -->
+          <div class="nav-item" data-page="accounts" onclick="switchPage('accounts')" title="邮箱池">
+            <i data-lucide="mail"></i>
+            <span class="nav-label" data-i18n="nav.accounts">邮箱池</span>
+          </div>
+          <!-- 号池 -->
+          <div class="nav-item" data-page="pools" onclick="switchPage('pools')" title="号池">
+            <i data-lucide="layers"></i>
+            <span class="nav-label" data-i18n="nav.pools">号池</span>
+          </div>
+          <!-- 网关 -->
+          <div class="nav-item" data-page="gateway" onclick="switchPage('gateway')" title="网关">
+            <i data-lucide="globe"></i>
+            <span class="nav-label" data-i18n="nav.gateway">网关</span>
+          </div>
+          <!-- 模型 -->
+          <div class="nav-item" data-page="models" onclick="switchPage('models')" title="模型">
+            <i data-lucide="cpu"></i>
+            <span class="nav-label" data-i18n="nav.models">模型</span>
+          </div>
+        </div>
+        <div class="sidebar-bottom">
+          <!-- 设置 -->
+          <div class="nav-item" data-page="settings" onclick="switchPage('settings')" title="设置">
+            <i data-lucide="settings"></i>
+            <span class="nav-label" data-i18n="nav.settings">设置</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 内容区 ===== -->
+      <div class="content">
+
+        <!-- ========== 概览页 ========== -->
+        <div class="page active" id="page-overview">
+          <div class="status-bar">
+            <span data-i18n="nav.overview">主页</span>
+            <span class="dot idle" id="st-dot"></span>
+            <span data-i18n="status.idle" id="ov-kiro-status">空闲</span>
+            <span style="flex:1"></span>
+            <span data-i18n="overview.progress">进度</span>
+            <span id="st-progress" style="color:var(--ink);font-weight:600">0/0</span>
+            <span data-i18n="overview.success" style="color:var(--green)">成功</span>
+            <span id="st-success" style="color:var(--green);font-weight:600">0</span>
+            <span data-i18n="overview.failed" style="color:var(--red)">失败</span>
+            <span id="st-failed" style="color:var(--red);font-weight:600">0</span>
+          </div>
+          <div class="ov-split">
+            <div class="ov-main">
+              <div class="stats">
+                <div class="stat">
+                  <div class="stat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 22 8.5 22 15.5 12 22 2 15.5 2 8.5"/><line x1="12" y1="22" x2="12" y2="15.5"/></svg>
+                  </div>
+                  <div>
+                    <div class="stat-lbl" data-i18n="overview.kiroAccounts">号池账号</div>
+                    <div class="stat-val" id="ov-pool-total">0</div>
+                  </div>
+                </div>
+                <div class="stat">
+                  <div class="stat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                  </div>
+                  <div>
+                    <div class="stat-lbl" data-i18n="overview.poolHealthy">健康</div>
+                    <div class="stat-val" id="ov-pool-healthy" style="color:#43c97c">0</div>
+                  </div>
+                </div>
+                <div class="stat">
+                  <div class="stat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>
+                  </div>
+                  <div>
+                    <div class="stat-lbl" data-i18n="overview.poolUnhealthy">异常</div>
+                    <div class="stat-val" id="ov-pool-unhealthy" style="color:#f0564d">0</div>
+                  </div>
+                </div>
+                <div class="stat">
+                  <div class="stat-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                  </div>
+                  <div>
+                    <div class="stat-lbl" data-i18n="overview.models">模型数</div>
+                    <div class="stat-val" id="ov-pool-models">0</div>
+                  </div>
+                </div>
+              </div>
+              <div class="sec" style="margin-top:18px">
+                <div class="sec-hd accent">
+                  <span data-i18n="overview.liveStatus">实时状态</span>
+                  <div style="display:flex;align-items:center;gap:12px;font-size:11.5px;font-weight:400;color:var(--text-3);">
+                    <span data-i18n="overview.elapsed">已耗时</span>
+                    <span id="st-elapsed" style="color:var(--ink);font-family:var(--font-mono)">0s</span>
+                    <span data-i18n="overview.avg">平均</span>
+                    <span id="st-avg" style="color:var(--ink);font-family:var(--font-mono)">-</span>
+                    <span data-i18n="overview.rate">成功率</span>
+                    <span id="st-rate" style="color:var(--ink);font-family:var(--font-mono)">-</span>
+                    <span data-i18n="overview.eta">预计剩余</span>
+                    <span id="st-eta" style="color:var(--ink);font-family:var(--font-mono)">-</span>
+                  </div>
+                </div>
+                <div class="sec-bd">
+                  <div class="prog"><div class="prog-fill" id="progress-bar" style="width:0%"></div></div>
+                </div>
+              </div>
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="overview.quickActions">快捷操作</span></div>
+                <div class="sec-bd" style="display:flex;gap:10px;flex-wrap:wrap">
+                  <button class="btn btn-outline" onclick="switchPage('register')">
+                    <i data-lucide="user-plus"></i><span data-i18n="nav.register">注册机</span>
+                  </button>
+                  <button class="btn btn-outline" onclick="switchPage('accounts')">
+                    <i data-lucide="mail"></i><span data-i18n="nav.accounts">邮箱池</span>
+                  </button>
+                  <button class="btn btn-outline" onclick="switchPage('pools')">
+                    <i data-lucide="layers"></i><span data-i18n="nav.pools">号池</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <aside class="ov-side">
+              <div class="ov-side-hd">
+                <span data-i18n="overview.activity">实时动态</span>
+                <span class="badge badge-idle" id="ov-feed-count">0</span>
+              </div>
+              <div class="ov-feed" id="ov-feed"></div>
+            </aside>
+          </div>
+        </div>
+
+        <!-- ========== 总日志页 ========== -->
+        <div class="page" id="page-masterlog">
+          <div class="status-bar">
+            <span data-i18n="masterlog.title">总日志</span>
+            <span style="flex:1"></span>
+            <button class="btn btn-outline btn-sm" onclick="copyLogs()">
+              <i data-lucide="copy"></i><span data-i18n="masterlog.copyLog">复制日志</span>
+            </button>
+          </div>
+          <div class="page-body" style="display:flex;flex-direction:column;min-height:0;">
+            <div class="sec" style="margin-bottom:0;flex:1;display:flex;flex-direction:column;min-height:0;">
+              <div class="sec-bd" style="padding:16px;flex:1;display:flex;flex-direction:column;min-height:0;">
+                <div class="log-box" id="masterlog-box"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 注册页 ========== -->
+        <div class="page" id="page-register">
+          <div class="status-bar">
+            <span data-i18n="register.newTask">新建注册任务</span>
+            <span style="flex:1"></span>
+            <span class="badge badge-idle" id="reg-status-badge" data-i18n="status.idle">空闲</span>
+          </div>
+          <div class="page-body">
+            <div class="page-body-wide">
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="common.general">基本配置</span></div>
+                <div class="sec-bd">
+                  <div class="frm-row">
+                    <div class="frm" style="margin-bottom:0">
+                      <label class="frm-lbl" data-i18n="register.count">注册数量</label>
+                      <input class="frm-inp" id="cfg-count" value="10" type="number" min="1">
+                    </div>
+                    <div class="frm" style="margin-bottom:0">
+                      <label class="frm-lbl" data-i18n="register.concurrency">并发数</label>
+                      <input class="frm-inp" id="cfg-concurrency" value="1" type="number" min="1">
+                    </div>
+                    <div class="frm" style="margin-bottom:0">
+                      <label class="frm-lbl" data-i18n="register.delay">延迟 (秒)</label>
+                      <input class="frm-inp" id="cfg-delay" value="3" type="number" min="0" step="0.5">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 邮箱提供商选择 -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="register.emailProvider">邮箱提供商</span></div>
+                <div class="sec-bd">
+                  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+                    <div class="pcard sel" id="pcard-outlook" onclick="selectEmailProvider('outlook')">
+                      <input type="radio" name="ep" value="outlook" checked>
+                      <span class="pcard-icon"><i data-lucide="mail"></i></span>
+                      <span class="pcard-lbl" data-i18n="register.outlook">Outlook</span>
+                    </div>
+                    <div class="pcard" id="pcard-cloudmail" onclick="selectEmailProvider('cloudmail')">
+                      <input type="radio" name="ep" value="cloudmail">
+                      <span class="pcard-icon"><i data-lucide="server"></i></span>
+                      <span class="pcard-lbl" data-i18n="register.cloudmail">Cloud-Mail</span>
+                    </div>
+                  </div>
+
+                  <!-- 提示 -->
+                  <div id="ep-hint" style="font-size:11.5px;color:var(--text-2);line-height:1.6;margin-bottom:14px;padding:11px 14px;border-radius:12px;background:var(--tile);" data-i18n="register.outlookHint">
+                    使用 Outlook 账号进行注册。
+                  </div>
+
+                  <!-- CloudMail 域名选择 -->
+                  <div id="cloudmail-sel" style="display:none">
+                    <label class="frm-lbl" data-i18n="register.selectDomain">选择域名</label>
+                    <div id="cfg-cloudmail-domains-list" class="dom-sel">
+                      <div style="text-align:center;color:var(--text-3);font-size:12px;padding:12px;" data-i18n="common.loading">加载中...</div>
+                    </div>
+                  </div>
+
+                  <div class="btn-group" style="margin-top:18px">
+                    <button class="btn btn-primary" onclick="startTask()">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      <span data-i18n="register.startBtn">开始注册</span>
+                    </button>
+                    <button class="btn btn-outline" onclick="stopTask()" style="color:var(--red)">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                      <span data-i18n="register.stopBtn">停止</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 手动注册（浏览器） -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="register.manualTitle">手动注册（浏览器）</span>
+                  <span class="sec-tag" style="font-size:10px;color:var(--text-3);margin-left:8px;">自动注册被风控拦截时的兜底方案</span>
+                </div>
+                <div class="sec-bd">
+                  <div style="font-size:11.5px;color:var(--text-2);line-height:1.7;margin-bottom:12px;padding:11px 14px;border-radius:12px;background:var(--tile);">
+                    <div data-i18n="register.manualDesc">弹出真实浏览器窗口，你在浏览器里手动完成 AWS Builder ID 注册 + 授权（真人操作可绕过 TES 风控与域名拉黑）。程序自动轮询令牌，注册成功后自动入库号池。</div>
+                    <div style="margin-top:6px"><span data-i18n="register.manualSteps">步骤：</span>① 点击下方按钮 → ② 浏览器弹出后手动注册并授权 → ③ 完成后程序自动验活入库。</div>
+                  </div>
+                  <div class="btn-group" style="margin-top:4px">
+                    <button class="btn btn-primary" id="btn-manual-reg" onclick="startManualRegister()">
+                      <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                      <span data-i18n="register.manualStart">开始手动注册</span>
+                    </button>
+                    <span class="badge badge-idle" id="manual-reg-badge" style="align-self:center">空闲</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 注册机日志（独立面板） -->
+              <div class="sec">
+                <div class="sec-hd accent">
+                  <span data-i18n="register.realtimeLog">实时日志</span>
+                  <button class="btn btn-outline btn-sm" onclick="copyLogs()">
+                    <i data-lucide="copy"></i><span data-i18n="masterlog.copyLog">复制日志</span>
+                  </button>
+                </div>
+                <div class="sec-bd" style="padding:0 16px 16px;">
+                  <div class="log-box" id="register-log-box" style="max-height:340px;min-height:150px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 邮箱池页 ========== -->
+        <div class="page" id="page-accounts">
+          <!-- 标签栏 -->
+          <div class="tabs">
+            <div class="tab active" data-tab="outlook" onclick="switchAccTab('outlook')" data-i18n="register.outlook">Outlook</div>
+            <div class="tab" data-tab="cloudmail" onclick="switchAccTab('cloudmail')" data-i18n="register.cloudmail">Cloud-Mail</div>
+          </div>
+          <div class="page-body" style="flex:1;min-height:0;display:flex;flex-direction:column;">
+            <!-- Outlook 标签 -->
+            <div class="tab-content active" id="tab-outlook">
+              <div class="sec" style="margin-bottom:0;flex:1;display:flex;flex-direction:column;">
+                <div class="sec-hd">
+                  <span data-i18n="accounts.outlookTitle">Outlook</span>
+                  <div class="btn-group">
+                    <span class="btn btn-primary btn-sm" onclick="openOutlookModal()" data-i18n="accounts.addAccount">添加账号</span>
+                    <span class="btn btn-outline btn-sm" onclick="importOutlookFile()"><i data-lucide="folder-open"></i><span>导入文件</span></span>
+                    <span class="btn btn-outline btn-sm" onclick="clearRegisteredOutlookAccounts()" data-i18n="accounts.clearRegistered">清除已注册</span>
+                    <span class="btn btn-outline btn-sm" style="color:var(--red)" onclick="clearAllOutlookAccounts()" data-i18n="accounts.clearAllTitle">清空全部</span>
+                  </div>
+                </div>
+                <div style="padding:0 22px 12px;font-size:11.5px;color:var(--text-3);display:flex;gap:8px;align-items:center;">
+                  <span data-i18n="accounts.count">共</span>
+                  <span id="outlook-count" style="color:var(--ink);font-weight:600">0 个</span>
+                </div>
+                <div style="flex:1;overflow-y:auto;">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style="width:40px" data-i18n="accounts.thIndex">#</th>
+                        <th data-i18n="accounts.thEmail">邮箱地址</th>
+                        <th style="width:100px" data-i18n="accounts.thStatus">状态</th>
+                        <th style="width:80px;text-align:right" data-i18n="accounts.thActions">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="outlook-account-body"></tbody>
+                  </table>
+                  <div class="empty" id="outlook-empty" style="display:none">
+                    <p data-i18n="accounts.emptyRow">暂无邮箱账号</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cloud-Mail 标签 -->
+            <div class="tab-content" id="tab-cloudmail">
+              <div class="sec" style="margin-bottom:0;flex:1;display:flex;flex-direction:column;">
+                <div class="sec-hd">
+                  <span data-i18n="accounts.cloudmailTitle">Cloud-Mail 自部署邮箱</span>
+                  <div class="btn-group">
+                    <button class="btn btn-outline btn-sm" onclick="clearAllCloudMailConfigs()" data-i18n="accounts.clearAllTitle">清空全部</button>
+                  </div>
+                </div>
+                <!-- 内联添加 -->
+                <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+                  <input id="cloudmail-inline-name" class="frm-inp" style="width:80px;font-size:11px;" placeholder="名称">
+                  <input id="cloudmail-inline-url" class="frm-inp" style="flex:1;min-width:120px;font-size:11px;" placeholder="http://your-cm.com">
+                  <input id="cloudmail-inline-email" class="frm-inp" style="width:130px;font-size:11px;" placeholder="admin@email.com">
+                  <input id="cloudmail-inline-password" class="frm-inp" style="width:100px;font-size:11px;" type="password" placeholder="密码">
+                  <button id="cloudmail-inline-test-btn" class="btn btn-outline btn-sm" onclick="inlineTestCloudMail()" data-i18n="common.test">测试</button>
+                  <button class="btn btn-primary btn-sm" onclick="inlineAddCloudMail()" data-i18n="accounts.addConfigBtn">添加</button>
+                  <span id="cloudmail-inline-status" style="font-size:11px;"></span>
+                </div>
+                <div style="flex:1;overflow-y:auto;padding:12px;">
+                  <div id="cloudmail-inline-list" style="font-size:12px;color:var(--text-3);">
+                    <div class="empty" data-i18n="cloudmail.emptyInline">暂无配置</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 号池页 ========== -->
+        <div class="page" id="page-pools">
+          <div class="status-bar">
+            <span data-i18n="pools.title">号池管理</span>
+            <span style="flex:1"></span>
+            <button class="btn btn-primary btn-sm" onclick="importAccountsToPool()">
+              <i data-lucide="plus"></i>
+              <span data-i18n="pools.importAccounts">添加账号</span>
+            </button>
+          </div>
+          <div class="page-body">
+            <div class="pool-dashboard">
+              <!-- 顶部统计卡片 -->
+              <div class="pool-stats-grid">
+                <div class="pool-stat-card">
+                  <div class="pool-stat-icon" style="background:var(--blue-dim);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2f80f5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                  </div>
+                  <div class="pool-stat-info">
+                    <span class="pool-stat-label" data-i18n="pools.totalAccounts">总账号</span>
+                    <span class="pool-stat-value" id="pool-total-count">0</span>
+                  </div>
+                </div>
+                <div class="pool-stat-card">
+                  <div class="pool-stat-icon" style="background:var(--green-dim);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#43c97c" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  </div>
+                  <div class="pool-stat-info">
+                    <span class="pool-stat-label" data-i18n="pools.healthy">健康</span>
+                    <span class="pool-stat-value" id="pool-healthy-count">0</span>
+                  </div>
+                </div>
+                <div class="pool-stat-card">
+                  <div class="pool-stat-icon" style="background:var(--red-dim);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f0564d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  </div>
+                  <div class="pool-stat-info">
+                    <span class="pool-stat-label" data-i18n="pools.unhealthy">异常</span>
+                    <span class="pool-stat-value" id="pool-unhealthy-count">0</span>
+                  </div>
+                </div>
+                <div class="pool-stat-card">
+                  <div class="pool-stat-icon" style="background:rgba(95,210,220,0.12);">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#5fd2dc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/></svg>
+                  </div>
+                  <div class="pool-stat-info">
+                    <span class="pool-stat-label" data-i18n="pools.availableModels">可用模型</span>
+                    <span class="pool-stat-value" id="pool-models-count">0</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 主内容区 -->
+              <div class="pool-main-layout">
+                <!-- 左侧 -->
+                <div class="pool-content">
+                  <!-- 账号使用趋势 -->
+                  <div class="pool-chart-card">
+                    <div class="pool-chart-header">
+                      <span class="pool-chart-title" data-i18n="pools.usageTrend">账号使用趋势</span>
+                      <span class="pool-chart-subtitle" data-i18n="pools.usageSubtitle">按账号的额度使用情况</span>
+                    </div>
+                    <div class="pool-chart-wrap" style="height:220px;"><canvas id="pool-usage-chart"></canvas></div>
+                  </div>
+                  <!-- 下排双卡片 -->
+                  <div class="pool-row-2">
+                    <div class="pool-chart-card">
+                      <div class="pool-chart-header">
+                        <span class="pool-chart-title" data-i18n="pools.healthDistribution">健康分布</span>
+                      </div>
+                      <div class="pool-chart-wrap" style="height:200px;"><canvas id="pool-health-chart"></canvas></div>
+                    </div>
+                    <div class="pool-chart-card">
+                      <div class="pool-chart-header">
+                        <span class="pool-chart-title" data-i18n="pools.modelDistribution">模型分布</span>
+                      </div>
+                      <div class="pool-chart-wrap" style="height:200px;"><canvas id="pool-models-chart"></canvas></div>
+                    </div>
+                  </div>
+                  <!-- 账号列表 -->
+                  <div class="pool-accounts-section">
+                    <div class="pool-section-header">
+                      <span class="pool-section-title" data-i18n="pools.accountList">账号列表</span>
+                      <div class="pool-section-actions">
+                        <button class="btn btn-outline btn-sm" onclick="refreshAllAccounts()">
+                          <i data-lucide="refresh-cw" style="width:13px;height:13px;"></i>
+                          <span data-i18n="pools.refreshAll">刷新全部</span>
+                        </button>
+                        <button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="clearAllAccounts()">
+                          <i data-lucide="trash-2" style="width:13px;height:13px;"></i>
+                          <span data-i18n="pools.clearAll">清空</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div id="pools-list" class="pool-accounts-grid"></div>
+                  </div>
+                </div>
+
+                <!-- 右侧详情面板 -->
+                <div class="pool-sidebar">
+                  <div class="pool-detail-card" id="pool-account-detail">
+                    <div class="pool-detail-header">
+                      <span class="pool-detail-title" data-i18n="pools.accountDetail">账号详情</span>
+                    </div>
+                    <div class="pool-detail-body" id="pool-detail-body">
+                      <div class="pool-detail-empty">
+                        <i data-lucide="mouse-pointer-click" style="width:24px;height:24px;color:var(--text-3);"></i>
+                        <span data-i18n="pools.clickToView">点击账号查看详情</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="pool-detail-card" id="pool-quota-overview">
+                    <div class="pool-detail-header">
+                      <span class="pool-detail-title" data-i18n="pools.quotaOverview">额度概览</span>
+                    </div>
+                    <div class="pool-detail-body" id="pool-quota-body"></div>
+                  </div>
+                  <div class="pool-detail-card">
+                    <div class="pool-detail-header">
+                      <span class="pool-detail-title" data-i18n="pools.recentActivity">最近活动</span>
+                    </div>
+                    <div class="pool-detail-body" id="pool-activity-body"></div>
+                  </div>
+                  <div class="pool-detail-card">
+                    <div class="pool-detail-header">
+                      <span class="pool-detail-title" data-i18n="pools.quickActions">快捷操作</span>
+                    </div>
+                    <div class="pool-quick-actions">
+                      <button class="pool-action-btn" onclick="refreshAllAccounts()">
+                        <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
+                        <span data-i18n="pools.refreshAllAccounts">刷新全部账号</span>
+                      </button>
+                      <button class="pool-action-btn" onclick="importAccountsToPool()">
+                        <i data-lucide="upload" style="width:16px;height:16px;"></i>
+                        <span data-i18n="pools.import">导入账号</span>
+                      </button>
+                      <button class="pool-action-btn" onclick="clearAllAccounts()">
+                        <i data-lucide="trash-2" style="width:16px;height:16px;"></i>
+                        <span data-i18n="pools.clearAllAccounts">清空全部账号</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 订阅页 ========== -->
+        <div class="page" id="page-subscription">
+          <div class="status-bar">
+            <span data-i18n="subscription.accountList">账号列表</span>
+            <span style="flex:1"></span>
+            <span id="sub-output-dir" style="font-size:10px;color:var(--text-3);"></span>
+          </div>
+          <div class="page-body" style="display:flex;flex-direction:column;">
+            <!-- 批量操作栏 -->
+            <div class="batch-bar">
+              <input type="checkbox" id="sub-select-all" onchange="toggleSubSelectAll(this.checked)" style="width:16px;height:16px;accent-color:var(--red);">
+              <span class="btn btn-primary btn-sm" id="sub-batch-btn" onclick="openSubscriptionPlanModal()" data-i18n="subscription.batchGet">一键获取选中</span>
+              <span class="btn btn-outline btn-sm" onclick="copyAllSubscriptionLinks()" data-i18n="subscription.copyLinks">复制选中链接</span>
+              <span class="btn btn-outline btn-sm" onclick="reloadSubscriptionAccounts()" data-i18n="subscription.reload">重新加载账号</span>
+              <div style="flex:1"></div>
+              <span style="font-size:11px;color:var(--text-3);" data-i18n="subscription.concurrency">并发</span>
+              <input type="number" id="sub-concurrency" value="3" min="1" max="20" style="width:50px;padding:3px 6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-size:12px;">
+              <span id="sub-progress" style="font-size:11px;color:var(--text-2);"></span>
+            </div>
+            <!-- 表格 -->
+            <div class="sec" style="margin-bottom:0;flex:1;display:flex;flex-direction:column;">
+              <div style="flex:1;overflow-y:auto;">
+                <table class="sub-table">
+                  <thead>
+                    <tr>
+                      <th style="width:36px"></th>
+                      <th style="width:36px" data-i18n="accounts.thIndex">#</th>
+                      <th data-i18n="subscription.thEmail">邮箱</th>
+                      <th style="width:100px" data-i18n="subscription.thSubscription">订阅</th>
+                      <th style="width:90px" data-i18n="subscription.thStatus">状态</th>
+                      <th style="width:120px;text-align:right" data-i18n="subscription.thActions">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sub-table-body"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 网关页 ========== -->
+        <div class="page" id="page-gateway">
+          <div class="status-bar">
+            <span data-i18n="nav.gateway">网关</span>
+            <span class="dot idle" id="gw-status-dot"></span>
+            <span id="gw-status-text" data-i18n="gateway.stopped">已停止</span>
+          </div>
+          <div class="page-body">
+            <div class="page-body-wide">
+              <!-- 网关控制 -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="gateway.control">网关控制</span></div>
+                <div class="sec-bd">
+                  <div class="stng-item">
+                    <div class="stng-info">
+                      <div class="stng-title" data-i18n="gateway.status">网关状态</div>
+                      <div class="stng-desc" data-i18n="gateway.statusDesc">开启后可通过本地端口访问 Kiro API</div>
+                    </div>
+                    <div class="stng-act">
+                      <button class="btn btn-primary" id="gw-toggle-btn" onclick="toggleGateway()">
+                        <i data-lucide="power"></i>
+                        <span data-i18n="gateway.start">开启网关</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="stng-item">
+                    <div class="stng-info">
+                      <div class="stng-title" data-i18n="gateway.port">端口设置</div>
+                      <div class="stng-desc" data-i18n="gateway.portDesc">网关监听的本地端口号</div>
+                    </div>
+                    <div class="stng-act" style="display:flex;gap:6px;align-items:center;">
+                      <input class="frm-inp" id="gw-port" type="number" value="20130" min="1024" max="65535" style="width:100px;">
+                      <button class="btn btn-outline btn-sm" onclick="saveGatewayPort()" data-i18n="common.save">保存</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 接入地址 -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="gateway.endpoint">接入地址</span></div>
+                <div class="sec-bd">
+                  <div class="stng-item">
+                    <div class="stng-info">
+                      <div class="stng-title" data-i18n="gateway.apiUrl">API 地址</div>
+                      <div class="stng-desc" data-i18n="gateway.apiUrlDesc">复制此地址到其他软件中使用（如 Cursor、Windsurf 等）</div>
+                    </div>
+                    <div class="stng-act" style="display:flex;gap:6px;align-items:center;">
+                      <input class="frm-inp" id="gw-url" readonly style="width:280px;font-family:var(--font-mono);font-size:12px;">
+                      <button class="btn btn-outline btn-sm" onclick="copyGatewayUrl()">
+                        <i data-lucide="copy"></i><span data-i18n="common.copy">复制</span>
+                      </button>
+                    </div>
+                  </div>
+                  <div class="stng-item">
+                    <div class="stng-info">
+                      <div class="stng-title" data-i18n="gateway.apiKey">API Key</div>
+                      <div class="stng-desc" data-i18n="gateway.apiKeyDesc">其他软件连接时使用的密钥，默认 123，可自行修改</div>
+                    </div>
+                    <div class="stng-act" style="display:flex;gap:6px;align-items:center;">
+                      <input class="frm-inp" id="gw-key" type="text" style="width:280px;font-family:var(--font-mono);font-size:12px;">
+                      <button class="btn btn-outline btn-sm" onclick="saveGatewayKey()" data-i18n="common.save">保存</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 模型页 ========== -->
+        <div class="page" id="page-models">
+          <div class="status-bar">
+            <span data-i18n="nav.models">模型</span>
+            <span style="flex:1"></span>
+            <span class="badge badge-ok" id="models-count">0</span>
+          </div>
+          <div class="page-body">
+            <div class="page-body-wide">
+              <div class="sec">
+                <div class="sec-hd">
+                  <span data-i18n="models.available">可用模型</span>
+                  <span style="flex:1"></span>
+                  <button class="btn btn-outline btn-sm" onclick="refreshModels()">
+                    <i data-lucide="refresh-cw"></i><span data-i18n="common.refresh">刷新</span>
+                  </button>
+                </div>
+                <div class="sec-bd">
+                  <div id="models-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 设置页 ========== -->
+        <div class="page" id="page-settings">
+          <div class="status-bar">
+            <span data-i18n="settings.general">常规设置</span>
+          </div>
+          <div class="page-body">
+            <div class="page-body-wide">
+              <!-- 语言 -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="settings.appearance">外观</span></div>
+                <div class="sec-bd">
+                </div>
+              </div>
+              <!-- 存储目录 -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="settings.dataDir">存储目录</span></div>
+                <div class="sec-bd">
+                  <div class="stng-item">
+                    <div class="stng-info">
+                      <div class="stng-desc" data-i18n="settings.dataDirDesc">Outlook 账号池等内部数据的本地存储位置</div>
+                    </div>
+                    <div class="stng-act" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                      <input class="frm-inp" id="cfg-data-dir" style="width:220px;font-size:11px;" placeholder="默认路径">
+                      <button class="btn btn-outline btn-sm" onclick="selectDataDir()" data-i18n="common.select">选择</button>
+                      <button class="btn btn-outline btn-sm" onclick="resetDataDir()" data-i18n="common.reset">重置</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- 输出目录 -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="settings.outputDir">注册结果输出目录</span></div>
+                <div class="sec-bd">
+                  <div class="stng-item">
+                    <div class="stng-info">
+                      <div class="stng-desc" data-i18n="settings.outputDirDesc">成功账号以明文 JSON 数组写入该目录下的 accounts.json</div>
+                    </div>
+                    <div class="stng-act" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                      <input class="frm-inp" id="cfg-result-output-dir" style="width:220px;font-size:11px;" placeholder="默认路径">
+                      <button class="btn btn-outline btn-sm" onclick="selectResultOutputDir()" data-i18n="common.select">选择</button>
+                      <button class="btn btn-outline btn-sm" onclick="resetResultOutputDir()" data-i18n="common.reset">重置</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- 出口代理 -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="settings.proxy">出口代理</span></div>
+                <div class="sec-bd">
+                  <div class="frm">
+                    <input class="frm-inp" id="cfg-proxy" placeholder="http://user:pass@127.0.0.1:7890" style="font-size:12px;font-family:var(--font-mono);">
+                    <div class="frm-hint" data-i18n="settings.proxyDesc">网关上游请求（模型对话）走该代理；留空=直连。支持 http/https/socks5 完整 URL。</div>
+                  </div>
+                  <div class="btn-group">
+                    <button class="btn btn-primary btn-sm" onclick="saveProxy()" data-i18n="common.save">保存</button>
+                    <button class="btn btn-outline btn-sm" onclick="testProxyNow()" id="proxy-test-btn" data-i18n="settings.testProxy">测试连通</button>
+                    <button class="btn btn-outline btn-sm" onclick="resetProxy()" data-i18n="common.reset">重置</button>
+                  </div>
+                  <div id="proxy-detect-card" style="display:none;margin-top:8px;"></div>
+                </div>
+              </div>
+              <!-- 代理池（注册机用） -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="settings.proxyPool">代理池</span><span class="sec-tag" style="font-size:10px;color:var(--text-3);margin-left:8px;">供注册机使用</span></div>
+                <div class="sec-bd">
+                  <div class="frm">
+                    <div class="frm-hint" data-i18n="settings.proxyPoolDesc">供注册机（Outlook 注册任务）使用的代理列表，按权重轮询选取。</div>
+                  </div>
+                  <div id="proxy-pool-list"></div>
+                  <button class="btn btn-outline btn-sm" onclick="addEmptyProxyRow()" style="margin-top:8px;">
+                    <i data-lucide="plus"></i><span>添加代理</span>
+                  </button>
+                </div>
+              </div>
+              <!-- 域名池（注册机用） -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="settings.domainPool">域名池</span><span class="sec-tag" style="font-size:10px;color:var(--text-3);margin-left:8px;">供 Cloud-Mail 注册机使用</span></div>
+                <div class="sec-bd">
+                  <div class="frm">
+                    <div class="frm-hint" data-i18n="settings.domainPoolDesc">自动同步 Cloud-Mail 服务器域名；被 TES 拉黑的域名自动标记并跳过注册，避免批量注册风控。</div>
+                  </div>
+                  <div id="domain-pool-list"><div style="text-align:center;color:var(--text-3);font-size:12px;padding:12px;">加载中...</div></div>
+                  <button class="btn btn-outline btn-sm" onclick="loadDomainPool()" style="margin-top:8px;">
+                    <i data-lucide="refresh-cw"></i><span data-i18n="common.refresh">刷新</span>
+                  </button>
+                </div>
+              </div>
+              <!-- 更新 -->
+              <div class="sec">
+                <div class="sec-hd"><span>自动更新</span></div>
+                <div class="sec-bd">
+                  </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ========== 关于页 ========== -->
+        <div class="page" id="page-info">
+          <div class="status-bar">
+            <span data-i18n="nav.about">关于</span>
+          </div>
+          <div class="page-body">
+            <div class="page-body-wide">
+              <!-- 版本信息 -->
+              <div class="sec">
+                <div class="sec-hd"><span>Kiro Client</span></div>
+                <div class="sec-bd">
+                  <dl class="info-grid">
+                    <dt data-i18n="about.currentVersion">当前版本</dt>
+                    <dd><span id="info-version-detail">-</span></dd>
+                    <dt data-i18n="about.latestVersion">最新版本</dt>
+                    <dd><span id="info-latest-version">-</span></dd>
+                    <dt data-i18n="about.releaseDate">发布日期</dt>
+                    <dd><span id="info-release-date">-</span></dd>
+                    </dl>
+                  <div class="btn-group" style="margin-top:12px">
+                    <button class="btn btn-outline btn-sm" onclick="window.open('https://qm.qq.com/q/RXMTXUlc4w')">QQ 群</button>
+                  </div>
+                </div>
+              </div>
+              <!-- 更新日志 -->
+              <div class="sec">
+                <div class="sec-hd"><span data-i18n="about.features">版本特性</span></div>
+                <div class="sec-bd">
+                  <div class="changelog" id="info-changelog">
+                    <span style="color:var(--text-3);" data-i18n="common.loading">加载中...</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /content -->
+    </div><!-- /mac-body -->
+  </div><!-- /main-container -->
+
+  <!-- ===== 模态框 ===== -->
+
+  <!-- 启动公告弹窗（每次启动显示，内容见 js/app.js 中 ANNOUNCE_CONTENT） -->
+  <div class="modal-o" id="announce-modal">
+    <div class="modal" style="max-width:440px;">
+      <div class="modal-hd">
+        <span>公告</span>
+        <span class="x" onclick="closeAnnounceModal()">&times;</span>
+      </div>
+      <div class="modal-bd">
+        <div id="announce-content" style="font-size:12.5px;line-height:1.8;color:var(--text-2);white-space:pre-wrap;user-select:text;"></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-primary" onclick="closeAnnounceModal()">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认对话框 -->
+  <div class="modal-o" id="confirm-modal">
+    <div class="modal" style="max-width:380px;">
+      <div class="modal-hd">
+        <span id="confirm-title" data-i18n="common.confirm">确认</span>
+        <span class="x" onclick="closeConfirmModal()">&times;</span>
+      </div>
+      <div class="modal-bd" style="text-align:center;">
+        <div class="confirm-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="confirm-msg" id="confirm-message"></div>
+        <div class="btn-group" style="justify-content:center;">
+          <button class="btn btn-outline" onclick="closeConfirmModal()" data-i18n="common.cancel">取消</button>
+          <button class="btn btn-primary" id="confirm-action-btn" onclick="confirmAction()" data-i18n="common.confirm">确认</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Outlook 添加账号 -->
+  <div class="modal-o" id="outlook-modal">
+    <div class="modal">
+      <div class="modal-hd">
+        <span data-i18n="accounts.addModalTitle">添加 Outlook 账号</span>
+        <span class="x" onclick="closeOutlookModal()">&times;</span>
+      </div>
+      <div class="modal-bd">
+        <div class="frm">
+          <label class="frm-lbl" data-i18n="accounts.thEmail">邮箱地址</label>
+          <input class="frm-inp" id="outlook-email-input" type="email" placeholder="user@outlook.com">
+        </div>
+        <div class="frm">
+          <label class="frm-lbl" data-i18n="common.notSet">密码</label>
+          <input class="frm-inp" id="outlook-pwd-input" type="password" placeholder="password">
+        </div>
+        <div style="font-size:10px;color:var(--text-3);line-height:1.5;" data-i18n="register.outlookHintFull">推荐使用 Outlook 应用专用密码。</div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-outline" onclick="closeOutlookModal()" data-i18n="common.cancel">取消</button>
+        <button class="btn btn-primary" onclick="addOutlookAccount()" data-i18n="accounts.addAccount">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 订阅计划选择 -->
+  <div class="modal-o" id="sub-plan-modal">
+    <div class="modal" style="max-width:450px;">
+      <div class="modal-hd">
+        <span data-i18n="subscription.planModalTitle">选择订阅计划</span>
+        <span class="x" onclick="closeSubscriptionPlanModal()">&times;</span>
+      </div>
+      <div class="modal-bd">
+        <div id="sub-plan-modal-hint" style="font-size:12px;color:var(--text-2);margin-bottom:12px;"></div>
+        <div id="sub-plan-modal-list"></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-outline" onclick="closeSubscriptionPlanModal()" data-i18n="common.cancel">取消</button>
+        <button class="btn btn-primary" id="sub-plan-modal-confirm" onclick="confirmStartBatchFetch()" data-i18n="subscription.startBatch">开始获取</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 订阅错误详情 -->
+  <div class="modal-o" id="sub-error-modal">
+    <div class="modal" style="max-width:500px;">
+      <div class="modal-hd">
+        <span data-i18n="subscription.errorModalTitle">获取失败 · 上游响应</span>
+        <span class="x" onclick="closeSubErrorModal()">&times;</span>
+      </div>
+      <div class="modal-bd">
+        <div style="font-size:12px;margin-bottom:8px;">
+          <span data-i18n="subscription.errorAccount">账号</span>:
+          <span id="sub-error-modal-email" style="font-family:var(--font-mono);color:var(--text);"></span>
+        </div>
+        <div id="sub-error-modal-body" style="background:#f7f9fd;border:1px solid var(--line);border-radius:12px;padding:14px;font-family:var(--font-mono);font-size:11px;line-height:1.65;white-space:pre-wrap;max-height:220px;overflow-y:auto;color:var(--text-2);user-select:text;"></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-outline btn-sm" onclick="copySubErrorDetail()" data-i18n="common.copy">复制</button>
+        <button class="btn btn-primary" onclick="closeSubErrorModal()" data-i18n="common.close">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast 容器 -->
+  <div id="toast-container"></div>
+
+  <!-- 号池模态框 -->
+  <!-- ===== Scripts ===== -->
+  <script src="assets/lucide.min.js"></script>
+  <script src="wailsjs/runtime/init.js"></script>
+  <script src="js/i18n.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/overview.js"></script>
+  <script src="js/task.js"></script>
+  <script src="js/accounts.js"></script>
+  <script src="js/cloudmail.js"></script>
+  <script src="js/subscription.js"></script>
+  <script src="js/proxy_pool.js"></script>
+  <script src="js/domain_pool.js"></script>
+  <script src="js/pools.js"></script>
+  <script src="js/gateway.js"></script>
+  <script src="js/models.js"></script>
+  <script src="js/license.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', function() { if (window.lucide) lucide.createIcons(); });</script>
+</body>
+</html>
