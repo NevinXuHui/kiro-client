@@ -1,0 +1,53 @@
+build.sh
+  e6c611d58b9d586b 1-132
+BUILD_AND_RUN.md
+  e6c611d58b9d586b 1-426
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "ad1b1be75f9bde2fe763b93f56a5b2cd21c84e05",
+  "prompts": {
+    "e6c611d58b9d586b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4bb9589b-8b9f-4e64-8afe-67364947b4ea",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 558,
+      "total_deletions": 0,
+      "accepted_lines": 558,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 558,
+    "git_diff_deleted_lines": 0,
+    "ai_additions": 558,
+    "ai_accepted": 558,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 558,
+    "BYRC": 0,
+    "per_file": {
+      "BUILD_AND_RUN.md": {
+        "BYMC": [],
+        "BYAC": [
+          "1-426"
+        ],
+        "BYRC": []
+      },
+      "build.sh": {
+        "BYMC": [],
+        "BYAC": [
+          "1-132"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787580367,
+  "requirement_id": ""
+}
