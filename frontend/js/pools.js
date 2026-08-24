@@ -508,7 +508,11 @@ function renderAccountDetail() {
       <span class="pool-detail-label">${label}</span>
       <span class="pool-detail-value">${escapeHtml(String(value))}</span>
     </div>
-  `).join('');
+  `).join('') + `
+    <button class="btn btn-outline btn-sm" style="margin-top:10px;width:100%;" onclick="exportSelectedAccount()">
+      ${_plT('pools.exportOne', '导出此账号')}
+    </button>
+  `;
 }
 
 // ===== 右侧：额度概览 =====
@@ -775,27 +779,44 @@ async function refreshAllAccounts() {
   }
 }
 
-// ===== 导出账号 =====
-function exportAccounts() {
-  if (!currentPool || !currentPool.accounts || currentPool.accounts.length === 0) {
-    showToast('暂无账号可导出', 'error');
+// ===== 导出账号（走原生保存对话框：WKWebView 的 <a download> 不会落盘）=====
+async function exportAccounts() {
+  if (!currentPool || !currentPool.id || !currentPool.accounts || currentPool.accounts.length === 0) {
+    showToast(_plT('pools.exportEmpty', '暂无账号可导出'), 'error');
     return;
   }
-  const data = currentPool.accounts.map(a => ({
-    clientId: a.clientId,
-    clientSecret: a.clientSecret,
-    refreshToken: a.refreshToken,
-    email: a.email,
-    provider: a.provider,
-    region: a.region,
-    subscription: a.subscription
-  }));
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = `kiro-accounts-${new Date().toISOString().slice(0,10)}.json`;
-  link.click();
-  URL.revokeObjectURL(url);
-  showToast(`已导出 ${data.length} 个账号`, 'success');
+  try {
+    const result = await window.go.main.App.ExportPoolAccounts(currentPool.id);
+    if (!result || result.cancelled) return;
+    if (result.error) {
+      showToast(result.error, 'error');
+      return;
+    }
+    const n = result.count || currentPool.accounts.length;
+    showToast(_plT('pools.exported', '已导出') + ' ' + n + ' ' + _plT('accounts.unit', '个'), 'success');
+  } catch (err) {
+    console.error('Failed to export accounts:', err);
+    showToast(_plT('pools.exportFailed', '导出失败'), 'error');
+  }
+}
+
+async function exportSelectedAccount() {
+  if (selectedAccountIdx < 0 || !currentPool || !currentPool.accounts) {
+    showToast(_plT('pools.clickToView', '点击账号查看详情'), 'error');
+    return;
+  }
+  const acc = currentPool.accounts[selectedAccountIdx];
+  if (!acc) return;
+  try {
+    const result = await window.go.main.App.ExportPoolAccount(currentPool.id, acc.email || '');
+    if (!result || result.cancelled) return;
+    if (result.error) {
+      showToast(result.error, 'error');
+      return;
+    }
+    showToast(_plT('pools.exported', '已导出') + ' ' + (acc.email || ''), 'success');
+  } catch (err) {
+    console.error('Failed to export account:', err);
+    showToast(_plT('pools.exportFailed', '导出失败'), 'error');
+  }
 }

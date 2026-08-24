@@ -283,6 +283,11 @@
                       <span class="pcard-icon"><i data-lucide="mail"></i></span>
                       <span class="pcard-lbl" data-i18n="register.outlook">Outlook</span>
                     </div>
+                    <div class="pcard" id="pcard-httpapi" onclick="selectEmailProvider('httpapi')">
+                      <input type="radio" name="ep" value="httpapi">
+                      <span class="pcard-icon"><i data-lucide="globe"></i></span>
+                      <span class="pcard-lbl" data-i18n="register.httpapi">HTTP 邮箱</span>
+                    </div>
                     <div class="pcard" id="pcard-cloudmail" onclick="selectEmailProvider('cloudmail')">
                       <input type="radio" name="ep" value="cloudmail">
                       <span class="pcard-icon"><i data-lucide="server"></i></span>
@@ -357,6 +362,7 @@
           <!-- 标签栏 -->
           <div class="tabs">
             <div class="tab active" data-tab="outlook" onclick="switchAccTab('outlook')" data-i18n="register.outlook">Outlook</div>
+            <div class="tab" data-tab="httpapi" onclick="switchAccTab('httpapi')" data-i18n="register.httpapi">HTTP 邮箱</div>
             <div class="tab" data-tab="cloudmail" onclick="switchAccTab('cloudmail')" data-i18n="register.cloudmail">Cloud-Mail</div>
           </div>
           <div class="page-body" style="flex:1;min-height:0;display:flex;flex-direction:column;">
@@ -389,6 +395,41 @@
                     <tbody id="outlook-account-body"></tbody>
                   </table>
                   <div class="empty" id="outlook-empty" style="display:none">
+                    <p data-i18n="accounts.emptyRow">暂无邮箱账号</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- HTTP 邮箱标签 -->
+            <div class="tab-content" id="tab-httpapi">
+              <div class="sec" style="margin-bottom:0;flex:1;display:flex;flex-direction:column;">
+                <div class="sec-hd">
+                  <span data-i18n="accounts.httpapiTitle">HTTP 邮箱</span>
+                  <div class="btn-group">
+                    <span class="btn btn-primary btn-sm" onclick="openHttpAPIModal()" data-i18n="accounts.addAccount">添加账号</span>
+                    <span class="btn btn-outline btn-sm" onclick="importHttpAPIFile()"><i data-lucide="folder-open"></i><span>导入文件</span></span>
+                    <span class="btn btn-outline btn-sm" onclick="clearRegisteredHttpAPIAccounts()" data-i18n="accounts.clearRegistered">清除已注册</span>
+                    <span class="btn btn-outline btn-sm" style="color:var(--red)" onclick="clearAllHttpAPIAccounts()" data-i18n="accounts.clearAllTitle">清空全部</span>
+                  </div>
+                </div>
+                <div style="padding:0 22px 12px;font-size:11.5px;color:var(--text-3);display:flex;gap:8px;align-items:center;">
+                  <span data-i18n="accounts.count">共</span>
+                  <span id="httpapi-count" style="color:var(--ink);font-weight:600">0 个</span>
+                </div>
+                <div style="flex:1;overflow-y:auto;">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th style="width:40px" data-i18n="accounts.thIndex">#</th>
+                        <th data-i18n="accounts.thEmail">邮箱地址</th>
+                        <th style="width:100px" data-i18n="accounts.thStatus">状态</th>
+                        <th style="width:80px;text-align:right" data-i18n="accounts.thActions">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody id="httpapi-account-body"></tbody>
+                  </table>
+                  <div class="empty" id="httpapi-empty" style="display:none">
                     <p data-i18n="accounts.emptyRow">暂无邮箱账号</p>
                   </div>
                 </div>
@@ -429,6 +470,10 @@
           <div class="status-bar">
             <span data-i18n="pools.title">号池管理</span>
             <span style="flex:1"></span>
+            <button class="btn btn-outline btn-sm" onclick="exportAccounts()">
+              <i data-lucide="download"></i>
+              <span data-i18n="pools.export">导出账号</span>
+            </button>
             <button class="btn btn-primary btn-sm" onclick="importAccountsToPool()">
               <i data-lucide="plus"></i>
               <span data-i18n="pools.importAccounts">添加账号</span>
@@ -508,6 +553,10 @@
                     <div class="pool-section-header">
                       <span class="pool-section-title" data-i18n="pools.accountList">账号列表</span>
                       <div class="pool-section-actions">
+                        <button class="btn btn-outline btn-sm" onclick="exportAccounts()">
+                          <i data-lucide="download" style="width:13px;height:13px;"></i>
+                          <span data-i18n="pools.export">导出</span>
+                        </button>
                         <button class="btn btn-outline btn-sm" onclick="refreshAllAccounts()">
                           <i data-lucide="refresh-cw" style="width:13px;height:13px;"></i>
                           <span data-i18n="pools.refreshAll">刷新全部</span>
@@ -555,6 +604,10 @@
                       <button class="pool-action-btn" onclick="refreshAllAccounts()">
                         <i data-lucide="refresh-cw" style="width:16px;height:16px;"></i>
                         <span data-i18n="pools.refreshAllAccounts">刷新全部账号</span>
+                      </button>
+                      <button class="pool-action-btn" onclick="exportAccounts()">
+                        <i data-lucide="download" style="width:16px;height:16px;"></i>
+                        <span data-i18n="pools.export">导出账号</span>
                       </button>
                       <button class="pool-action-btn" onclick="importAccountsToPool()">
                         <i data-lucide="upload" style="width:16px;height:16px;"></i>
@@ -847,22 +900,6 @@
 
   <!-- ===== 模态框 ===== -->
 
-  <!-- 启动公告弹窗（每次启动显示，内容见 js/app.js 中 ANNOUNCE_CONTENT） -->
-  <div class="modal-o" id="announce-modal">
-    <div class="modal" style="max-width:440px;">
-      <div class="modal-hd">
-        <span>公告</span>
-        <span class="x" onclick="closeAnnounceModal()">&times;</span>
-      </div>
-      <div class="modal-bd">
-        <div id="announce-content" style="font-size:12.5px;line-height:1.8;color:var(--text-2);white-space:pre-wrap;user-select:text;"></div>
-      </div>
-      <div class="modal-ft">
-        <button class="btn btn-primary" onclick="closeAnnounceModal()">知道了</button>
-      </div>
-    </div>
-  </div>
-
   <!-- 确认对话框 -->
   <div class="modal-o" id="confirm-modal">
     <div class="modal" style="max-width:380px;">
@@ -892,18 +929,35 @@
       </div>
       <div class="modal-bd">
         <div class="frm">
-          <label class="frm-lbl" data-i18n="accounts.thEmail">邮箱地址</label>
-          <input class="frm-inp" id="outlook-email-input" type="email" placeholder="user@outlook.com">
+          <label class="frm-lbl" data-i18n="accounts.manualFormat">格式：邮箱----密码----ClientID----RefreshToken（后两段可对调），每行一个</label>
+          <textarea class="frm-inp" id="outlook-card-input" rows="6" style="resize:vertical;font-family:var(--font-mono);font-size:12px;" placeholder="user@outlook.com----password----clientid----refresh_token"></textarea>
         </div>
-        <div class="frm">
-          <label class="frm-lbl" data-i18n="common.notSet">密码</label>
-          <input class="frm-inp" id="outlook-pwd-input" type="password" placeholder="password">
-        </div>
-        <div style="font-size:10px;color:var(--text-3);line-height:1.5;" data-i18n="register.outlookHintFull">推荐使用 Outlook 应用专用密码。</div>
+        <div style="font-size:10px;color:var(--text-3);line-height:1.5;" data-i18n="register.outlookHintFull">用 refresh_token 走 IMAP OAuth2 收信，access_token 由程序自动刷新。</div>
       </div>
       <div class="modal-ft">
         <button class="btn btn-outline" onclick="closeOutlookModal()" data-i18n="common.cancel">取消</button>
         <button class="btn btn-primary" onclick="addOutlookAccount()" data-i18n="accounts.addAccount">添加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HTTP 邮箱添加账号 -->
+  <div class="modal-o" id="httpapi-modal">
+    <div class="modal">
+      <div class="modal-hd">
+        <span data-i18n="accounts.httpapiModalTitle">添加 HTTP 邮箱</span>
+        <span class="x" onclick="closeHttpAPIModal()">&times;</span>
+      </div>
+      <div class="modal-bd">
+        <div class="frm">
+          <label class="frm-lbl" data-i18n="accounts.httpapiFormat">格式：邮箱----API地址，每行一个（支持「邮箱：」前缀）</label>
+          <textarea class="frm-inp" id="httpapi-card-input" rows="6" style="resize:vertical;font-family:var(--font-mono);font-size:12px;" placeholder="user@icloud.com----https://ourmail.top/api/v1/mailboxes/messages?limit=1&format=html&email=user@icloud.com"></textarea>
+        </div>
+        <div style="font-size:10px;color:var(--text-3);line-height:1.5;" data-i18n="register.httpapiHintFull">通过 HTTP GET 拉取邮件并提取 6 位验证码。ourmail.top 等接口可直接粘贴。</div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-outline" onclick="closeHttpAPIModal()" data-i18n="common.cancel">取消</button>
+        <button class="btn btn-primary" onclick="addHttpAPIAccount()" data-i18n="accounts.addAccount">添加</button>
       </div>
     </div>
   </div>

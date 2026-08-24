@@ -120,6 +120,8 @@ function selectEmailProvider(provider) {
   if (provider === 'cloudmail') {
     if (hintEl) { hintEl.textContent = _uiT('register.cloudmailHint', '使用 Cloud-Mail 自部署邮箱注册。⚠️ 每次注册会创建永久账号，需手动清理。'); }
     loadCloudMailDomainsToList();
+  } else if (provider === 'httpapi') {
+    if (hintEl) { hintEl.textContent = _uiT('register.httpapiHint', '使用 HTTP API 邮箱注册。卡密：邮箱----API地址（支持「邮箱：」前缀）'); }
   } else {
     if (hintEl) { hintEl.textContent = _uiT('register.outlookHintFull', '使用 Outlook 账号进行注册，代理配置请在设置页设置。'); }
   }
@@ -278,7 +280,8 @@ function closeKiroTaskModal() {
 // ===== 模态框遮罩层关闭逻辑（仅当 mousedown 和 mouseup 都在遮罩层上时才关闭） =====
 (function() {
   var modalCloseMap = {
-    'outlook-modal': function() { if (typeof closeOutlookModal === 'function') closeOutlookModal(); }
+    'outlook-modal': function() { if (typeof closeOutlookModal === 'function') closeOutlookModal(); },
+    'httpapi-modal': function() { if (typeof closeHttpAPIModal === 'function') closeHttpAPIModal(); }
   };
 
   var mouseDownTarget = null;

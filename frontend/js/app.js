@@ -1,22 +1,5 @@
 // ===== 核心：导航 / 标签页 / 下拉框 / 配置 / 卡密 / Toast / 窗口控制 =====
 
-// 启动公告：每次启动弹出。内容后续补充——直接改此常量即可
-var ANNOUNCE_CONTENT = [
-  '本项目请勿高并发注册，严禁商用',
-  '注册机强烈建议配置代理池和域名池，并发1注册数＜2，短时间请勿多次重试和注册，避免风控导致ip和域名被拉黑',
-  '本项目所有内容伴随aws检测更新而失效，不适合作为主力使用',
-  'glm-5检测基本成功，claude-sonnet-4.5失败时请勿过多检测，触发上游冷却'
-].join('\n');
-function showAnnounceModal() {
-  var content = document.getElementById('announce-content');
-  if (!content || !ANNOUNCE_CONTENT) return;
-  content.textContent = ANNOUNCE_CONTENT;
-  document.getElementById('announce-modal').classList.add('show');
-}
-function closeAnnounceModal() {
-  document.getElementById('announce-modal').classList.remove('show');
-}
-
 // 页面切换
 var _currentPageId = 'overview';
 function getPageTitle(pageId) {
@@ -45,8 +28,13 @@ function switchPage(pageId) {
   if (pageId === 'accounts') {
     loadOutlookAccountsList();
     startOutlookAutoRefresh();
+    if (typeof loadHttpAPIAccountsList === 'function') {
+      loadHttpAPIAccountsList();
+      startHttpAPIAutoRefresh();
+    }
   } else {
     stopOutlookAutoRefresh();
+    if (typeof stopHttpAPIAutoRefresh === 'function') stopHttpAPIAutoRefresh();
   }
   if (pageId === 'info') {
     loadInfoVersion();
@@ -415,6 +403,7 @@ async function loadConfig() {
     console.error('[启动] 加载配置失败:', e);
   }
   loadOutlookAccountsList();
+  if (typeof loadHttpAPIAccountsList === 'function') loadHttpAPIAccountsList();
   loadDataDir();
   loadProxy();
   loadResultOutputDir();
@@ -437,7 +426,6 @@ window.addEventListener('DOMContentLoaded', async function() {
       if (tb) tb.textContent = getPageTitle(_currentPageId);
     }
   } catch(e) {}
-  showAnnounceModal();
   });
 
 
