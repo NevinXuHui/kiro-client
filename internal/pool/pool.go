@@ -27,7 +27,10 @@ type Account struct {
 	ClientSecret string `json:"clientSecret"`
 	RefreshToken string `json:"refreshToken"`
 	Email        string `json:"email"`
+	Password     string `json:"password,omitempty"`
 	Provider     string `json:"provider"`
+	ProxyIP      string `json:"proxy_ip,omitempty"`
+	ProxyRegion  string `json:"proxy_region,omitempty"`
 	Region       string `json:"region"`
 	Subscription string `json:"subscription"`
 	CreditLimit  int    `json:"creditLimit"`
@@ -340,15 +343,15 @@ func (m *Manager) AddAccountToPool(poolID string, account *Account) error {
 	return m.save()
 }
 
-// ImportAccountsFromFile 从 JSON 文件导入账号
+// ImportAccountsFromFile 从 JSON 文件导入账号（支持单对象或数组）
 func ImportAccountsFromFile(filePath string) ([]*Account, error) {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
 
-	var accounts []*Account
-	if err := json.Unmarshal(data, &accounts); err != nil {
+	accounts, err := ParseAccountJSON(data)
+	if err != nil {
 		return nil, fmt.Errorf("failed to parse JSON: %w", err)
 	}
 

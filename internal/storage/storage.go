@@ -19,13 +19,13 @@ const (
 )
 
 var (
-	_dataDir          string
-	_dataDirOnce      sync.Once
-	_resultOutputDir  string
-	_resultOutputOnce sync.Once
-	_proxy            string
-	_proxyOnce        sync.Once
-	_gatewayAPIKey    string
+	_dataDir           string
+	_dataDirOnce       sync.Once
+	_resultOutputDir   string
+	_resultOutputOnce  sync.Once
+	_proxy             string
+	_proxyOnce         sync.Once
+	_gatewayAPIKey     string
 	_gatewayAPIKeyOnce sync.Once
 )
 
@@ -319,11 +319,15 @@ func NormalizeProxyAddress(s string) string {
 // migrateData 将旧目录中的数据文件迁移到新目录
 func migrateData(oldDir, newDir string) (int, error) {
 	migrated := 0
-	items := []string{"accounts.json", "accounts.dat"}
+	pairs := [][2]string{
+		{"accounts.json", "accounts.json"},
+		{"accounts.dat", "accounts.json"},
+		{"httpapi.json", "httpapi.json"},
+	}
 
-	for _, item := range items {
-		src := filepath.Join(oldDir, item)
-		dst := filepath.Join(newDir, "accounts.json")
+	for _, pair := range pairs {
+		src := filepath.Join(oldDir, pair[0])
+		dst := filepath.Join(newDir, pair[1])
 
 		if _, err := os.Stat(src); err != nil {
 			continue
@@ -438,6 +442,95 @@ func FlushAccountsSync() {
 		_flushTimer.Stop()
 	}
 	flushAccountsToDisk()
+	httpAPIList.flush()
+}
+
+// ===== HTTP API 邮箱池缓存 =====
+
+func GetHttpAPIPath() string {
+	return filepath.Join(GetDataDir(), "httpapi.json")
+}
+
+type memJSONList struct {
+	pathFn func() string
+	mu     sync.Mutex
+	items  []map[string]interface{}
+	loaded bool
+	dirty  bool
+	timer  *time.Timer
+}
+
+func (s *memJSONList) get() []map[string]interface{} {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureLocked()
+	out := make([]map[string]interface{}, len(s.items))
+	copy(out, s.items)
+	return out
+}
+
+func (s *memJSONList) set(items []map[string]interface{}) {
+	s.mu.Lock()
+	s.items = items
+	s.loaded = true
+	s.dirty = true
+	s.scheduleLocked()
+	s.mu.Unlock()
+}
+
+func (s *memJSONList) modify(fn func([]map[string]interface{}) []map[string]interface{}) {
+	s.mu.Lock()
+	s.ensureLocked()
+	s.items = fn(s.items)
+	s.dirty = true
+	s.scheduleLocked()
+	s.mu.Unlock()
+}
+
+func (s *memJSONList) ensureLocked() {
+	if s.loaded {
+		return
+	}
+	data, err := loadJSON(s.pathFn())
+	if err != nil {
+		s.items = []map[string]interface{}{}
+	} else {
+		s.items = data
+	}
+	s.loaded = true
+}
+
+func (s *memJSONList) scheduleLocked() {
+	if s.timer != nil {
+		s.timer.Stop()
+	}
+	s.timer = time.AfterFunc(500*time.Millisecond, s.flush)
+}
+
+func (s *memJSONList) flush() {
+	s.mu.Lock()
+	if !s.dirty {
+		s.mu.Unlock()
+		return
+	}
+	data := make([]map[string]interface{}, len(s.items))
+	copy(data, s.items)
+	path := s.pathFn()
+	s.mu.Unlock()
+	err := SaveJSON(path, data)
+	s.mu.Lock()
+	if err == nil {
+		s.dirty = false
+	}
+	s.mu.Unlock()
+}
+
+var httpAPIList = &memJSONList{pathFn: GetHttpAPIPath}
+
+func GetHttpAPICached() []map[string]interface{}      { return httpAPIList.get() }
+func SetHttpAPICached(items []map[string]interface{}) { httpAPIList.set(items) }
+func ModifyHttpAPICached(fn func([]map[string]interface{}) []map[string]interface{}) {
+	httpAPIList.modify(fn)
 }
 
 // ===== JSON 存储读写 =====

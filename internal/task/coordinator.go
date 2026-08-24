@@ -24,7 +24,7 @@ type StartTaskRequest struct {
 	Concurrency   int    `json:"concurrency"`
 	Delay         int    `json:"delay"`
 	OutputPath    string `json:"outputPath"`
-	EmailProvider string `json:"emailProvider"` // "outlook" / "cloudmail"
+	EmailProvider string `json:"emailProvider"` // "outlook" / "cloudmail" / "httpapi"
 
 	CloudMailDomains    []string                           `json:"cloudmailDomains"`
 	CloudMailConfigs    map[string][]email.CloudMailConfig `json:"cloudmailConfigs"`
@@ -51,6 +51,7 @@ func startTask(req StartTaskRequest) map[string]interface{} {
 	}
 
 	var outlookAccounts []email.OutlookAccount
+	var httpAPIAccounts []email.HttpAPIAccount
 
 	if emailProvider == "cloudmail" {
 		if len(req.CloudMailDomains) == 0 {
@@ -60,6 +61,37 @@ func startTask(req StartTaskRequest) map[string]interface{} {
 		if len(req.CloudMailConfigs) == 0 {
 			Manager.mu.Unlock()
 			return map[string]interface{}{"error": "cloud-mail 配置缺失"}
+		}
+	} else if emailProvider == "httpapi" {
+		storedAccounts := storage.GetHttpAPICached()
+		if len(storedAccounts) == 0 {
+			Manager.mu.Unlock()
+			return map[string]interface{}{"error": "请先添加 HTTP 邮箱账号"}
+		}
+		for _, acc := range storedAccounts {
+			registered, _ := acc["registered"].(bool)
+			if registered {
+				continue
+			}
+			emailAddr, _ := acc["email"].(string)
+			apiURL, _ := acc["apiUrl"].(string)
+			if emailAddr == "" || apiURL == "" {
+				continue
+			}
+			httpAPIAccounts = append(httpAPIAccounts, email.HttpAPIAccount{
+				Email:  emailAddr,
+				APIURL: apiURL,
+			})
+		}
+		if len(httpAPIAccounts) == 0 {
+			Manager.mu.Unlock()
+			return map[string]interface{}{"error": "没有可用的 HTTP 邮箱账号（所有账号已注册成功）"}
+		}
+		if len(httpAPIAccounts) < req.Count {
+			Manager.mu.Unlock()
+			return map[string]interface{}{
+				"error": fmt.Sprintf("可用 HTTP 邮箱不足: 需要 %d, 仅有 %d", req.Count, len(httpAPIAccounts)),
+			}
 		}
 	} else {
 		// Outlook 模式：加载账号列表
@@ -117,7 +149,7 @@ func startTask(req StartTaskRequest) map[string]interface{} {
 	Manager.logsMu.Unlock()
 
 	// 后台执行
-	go runBatch(req, emailProvider, outlookAccounts)
+	go runBatch(req, emailProvider, outlookAccounts, httpAPIAccounts)
 
 	return map[string]interface{}{"status": "started"}
 }
@@ -148,7 +180,7 @@ func StopTask(force bool) map[string]interface{} {
 }
 
 // runBatch 执行批量注册
-func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []email.OutlookAccount) {
+func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []email.OutlookAccount, httpAPIAccounts []email.HttpAPIAccount) {
 	// 创建可取消的 context，停止时立即中断所有 HTTP 请求
 	taskCtx, taskCancel := context.WithCancel(context.Background())
 	defer taskCancel()
@@ -194,6 +226,8 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		}
 
 		log.Printf("[Kiro] cloud-mail 域名池: %v (共 %d 个域名)", cloudmailDomainPool, len(cloudmailDomainPool))
+	} else if emailProvider == "httpapi" {
+		taskConfig.UseHttpAPI = true
 	} else if emailProvider == "outlook" {
 		taskConfig.UseOutlook = true
 	}
@@ -204,7 +238,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 	var failRegistered, failNetwork, failBanned, failOther int
 	taskStartTime := time.Now()
 
-	// 共享账号池（并发安全），goroutine 动态领取账号（仅 Outlook 模式使用）
+	// 共享账号池（并发安全），goroutine 动态领取账号（Outlook / HTTP API）
 	var accountPoolMu sync.Mutex
 	accountPoolIdx := 0
 	nextAccount := func() (email.OutlookAccount, bool) {
@@ -215,6 +249,17 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		}
 		acc := outlookAccounts[accountPoolIdx]
 		accountPoolIdx++
+		return acc, true
+	}
+	httpAPIPoolIdx := 0
+	nextHttpAPIAccount := func() (email.HttpAPIAccount, bool) {
+		accountPoolMu.Lock()
+		defer accountPoolMu.Unlock()
+		if httpAPIPoolIdx >= len(httpAPIAccounts) {
+			return email.HttpAPIAccount{}, false
+		}
+		acc := httpAPIAccounts[httpAPIPoolIdx]
+		httpAPIPoolIdx++
 		return acc, true
 	}
 
@@ -306,6 +351,18 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 				return
 			}
 			taskCfg.OutlookAccount = &acc
+			currentEmail = acc.Email
+		} else if emailProvider == "httpapi" {
+			acc, ok := nextHttpAPIAccount()
+			if !ok {
+				log.Printf("[Kiro][%d/%d] 无可用 HTTP 邮箱，跳过", i+1, req.Count)
+				Manager.mu.Lock()
+				Manager.completed++
+				Manager.failed++
+				Manager.mu.Unlock()
+				return
+			}
+			taskCfg.HttpAPIAccount = &acc
 			currentEmail = acc.Email
 		} else if emailProvider == "cloudmail" {
 			// 创建 cloud-mail 邮箱（换域名重试时复用）。返回邮箱地址与是否成功。
@@ -449,18 +506,29 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 			}
 
 			// 邮箱已注册：标记当前账号，换号重来（重置 attempt）
-			if taskConfig.UseOutlook && strings.Contains(errorMsg, "邮箱已注册过") {
+			if (taskConfig.UseOutlook || taskConfig.UseHttpAPI) && strings.Contains(errorMsg, "邮箱已注册过") {
 				log.Printf("[Kiro][%d/%d] %s 已注册，标记并换号", i+1, req.Count, currentEmail)
-				email.UpdateAccountStatus(currentEmail, true, false)
-				acc, ok := nextAccount()
-				if ok {
-					taskCfg.OutlookAccount = &acc
-					taskCfg.Password = core.GenPassword()
-					currentEmail = acc.Email
-					attempt = -1 // 换号：代理预算重置
-					continue retryLoop
+				if taskConfig.UseOutlook {
+					email.UpdateAccountStatus(currentEmail, true, false)
+					acc, ok := nextAccount()
+					if ok {
+						taskCfg.OutlookAccount = &acc
+						taskCfg.Password = core.GenPassword()
+						currentEmail = acc.Email
+						attempt = -1
+						continue retryLoop
+					}
+				} else {
+					email.UpdateHttpAPIAccountStatus(currentEmail, true, false)
+					acc, ok := nextHttpAPIAccount()
+					if ok {
+						taskCfg.HttpAPIAccount = &acc
+						taskCfg.Password = core.GenPassword()
+						currentEmail = acc.Email
+						attempt = -1
+						continue retryLoop
+					}
 				}
-				// 账号池耗尽
 				log.Printf("[Kiro][%d/%d] 账号池已耗尽", i+1, req.Count)
 				break
 			}
@@ -538,7 +606,12 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 			if passwordSet {
 				email.UpdateAccountStatus(currentEmail, true, success)
 			}
-			// 未设密码的失败邮箱不标记 registered，下次任务可继续使用
+		}
+		if taskConfig.UseHttpAPI && currentEmail != "" {
+			passwordSet, _ := result["passwordSet"].(bool)
+			if passwordSet {
+				email.UpdateHttpAPIAccountStatus(currentEmail, true, success)
+			}
 		}
 		if success {
 			if err := data.SaveKiroSuccess(result, outDir); err != nil {
@@ -698,6 +771,9 @@ func autoAddToPool(result map[string]interface{}) {
 		Provider:     "BuilderId",
 		Region:       "us-east-1",
 		Time:         time.Now().Format("2006-01-02 15:04:05"),
+	}
+	if pw, _ := result["password"].(string); pw != "" {
+		acc.Password = pw
 	}
 
 	// 填充可选字段
