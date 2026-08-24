@@ -623,7 +623,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 	}
 
 	if req.Concurrency > 1 {
-		log.Printf("[Kiro] 启动并发任务: %d 个任务，并发数 %d", req.Count, req.Concurrency)
+		log.Printf("[Kiro] 启动并发任务: %d 个任务，并发数 %d，延时 %d 秒", req.Count, req.Concurrency, req.Delay)
 		sem := make(chan struct{}, req.Concurrency)
 		var wg sync.WaitGroup
 	loop:
@@ -633,6 +633,12 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 				break loop
 			default:
 			}
+
+			// 并发模式下的账号间延时（在启动任务前延时）
+			if req.Delay > 0 && i > 0 {
+				time.Sleep(time.Duration(req.Delay) * time.Second)
+			}
+
 			wg.Add(1)
 			sem <- struct{}{}
 			go func(idx int) {
@@ -643,7 +649,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		}
 		wg.Wait()
 	} else {
-		log.Printf("[Kiro] 启动串行任务: %d 个任务", req.Count)
+		log.Printf("[Kiro] 启动串行任务: %d 个任务，延时 %d 秒", req.Count, req.Delay)
 		for i := 0; i < req.Count; i++ {
 			select {
 			case <-Manager.stopCh:
