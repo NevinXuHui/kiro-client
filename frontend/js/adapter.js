@@ -195,8 +195,129 @@ window.go = {
         return { success: true };
       },
 
-      RemoveOutlookAccount: async function(email) {
+      AddOutlookAccounts: async function(data) {
+        try {
+          // 解析账号数据
+          const lines = data.trim().split('\n');
+          let addedCount = 0;
+          const accounts = await this.GetOutlookAccounts();
+
+          for (const line of lines) {
+            const trimmedLine = line.trim();
+            if (!trimmedLine || trimmedLine.startsWith('#') || trimmedLine.startsWith('//')) {
+              continue;
+            }
+
+            // 解析格式：邮箱----密码----ClientID----RefreshToken
+            const parts = trimmedLine.split('----');
+            if (parts.length < 4) {
+              console.warn('跳过格式错误的行:', trimmedLine.substring(0, 50));
+              continue;
+            }
+
+            const email = parts[0].trim();
+            const password = parts[1].trim();
+            const field3 = parts[2].trim();
+            const field4 = parts[3].trim();
+
+            // 自动识别 ClientID 和 RefreshToken
+            let clientId, refreshToken;
+            if (field3.startsWith('aorAAAAAG')) {
+              refreshToken = field3;
+              clientId = field4;
+            } else if (field4.startsWith('aorAAAAAG')) {
+              clientId = field3;
+              refreshToken = field4;
+            } else if (field3.includes('nVzLWVhc3QtMQ')) {
+              clientId = field3;
+              refreshToken = field4;
+            } else if (field4.includes('nVzLWVhc3QtMQ')) {
+              clientId = field4;
+              refreshToken = field3;
+            } else {
+              clientId = field3;
+              refreshToken = field4;
+            }
+
+            // 检查是否已存在
+            const exists = accounts.some(acc => acc.email === email);
+            if (exists) {
+              console.log('账号已存在，跳过:', email);
+              continue;
+            }
+
+            // 添加账号
+            accounts.push({
+              email,
+              password,
+              clientId,
+              refreshToken,
+              registered: false,
+              success: false,
+              addedAt: new Date().toISOString()
+            });
+            addedCount++;
+          }
+
+          if (addedCount === 0) {
+            return { error: '未解析到有效账号或所有账号已存在' };
+          }
+
+          // 保存到 localStorage
+          localStorage.setItem('kiro_outlook_accounts', JSON.stringify(accounts));
+
+          return {
+            added: addedCount,
+            total: accounts.length
+          };
+        } catch (err) {
+          console.error('AddOutlookAccounts error:', err);
+          return { error: err.message };
+        }
+      },
+
+      DeleteOutlookAccount: async function(email) {
         let accounts = await this.GetOutlookAccounts();
+        const originalLength = accounts.length;
+        accounts = accounts.filter(acc => acc.email !== email);
+        localStorage.setItem('kiro_outlook_accounts', JSON.stringify(accounts));
+        return {
+          status: 'deleted',
+          total: accounts.length,
+          success: accounts.length < originalLength
+        };
+      },
+
+      RemoveOutlookAccount: async function(email) {
+        return await this.DeleteOutlookAccount(email);
+      },
+
+      ClearOutlookAccounts: async function() {
+        localStorage.setItem('kiro_outlook_accounts', JSON.stringify([]));
+        return { status: 'cleared' };
+      },
+
+      ClearRegisteredOutlookAccounts: async function() {
+        let accounts = await this.GetOutlookAccounts();
+        const originalCount = accounts.length;
+        accounts = accounts.filter(acc => !acc.registered);
+        localStorage.setItem('kiro_outlook_accounts', JSON.stringify(accounts));
+        return {
+          status: 'ok',
+          removed: originalCount - accounts.length,
+          total: accounts.length
+        };
+      },
+
+      SelectOutlookFile: async function() {
+        // Web 版本无法直接选择文件
+        return '';
+      },
+
+      ImportOutlookFile: async function(path) {
+        // Web 版本暂不支持文件导入
+        return { error: 'Web 版本暂不支持文件导入，请直接粘贴账号数据' };
+      },
         accounts = accounts.filter(acc => acc.email !== email);
         localStorage.setItem('kiro_outlook_accounts', JSON.stringify(accounts));
         return { success: true };
