@@ -1,0 +1,85 @@
+README.md
+  ef2d8723cc314534 87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "3d4b57000020da5e140fdd807c290075215abce0",
+  "prompts": {
+    "1d6eb96a5176dd88": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36581df8-5a95-4cda-a10a-5f530128a5ab",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "ef2d8723cc314534": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e4058ee-4839-4bf7-9378-326803801b7f",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 177,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 131,
+    "git_diff_deleted_lines": 22,
+    "ai_additions": 1,
+    "ai_accepted": 1,
+    "BYMC": 126,
+    "mixed_additions": 0,
+    "BYAC": 1,
+    "BYRC": 0,
+    "per_file": {
+      "README.md": {
+        "BYMC": [
+          "27",
+          "37",
+          "90-94",
+          "98",
+          "112",
+          "155",
+          "189"
+        ],
+        "BYAC": [
+          "87"
+        ],
+        "BYRC": []
+      },
+      "app.go": {
+        "BYMC": [
+          "61",
+          "64-67",
+          "69-88",
+          "343-345",
+          "459-473",
+          "1046-1115"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "docs/ARCHITECTURE.md": {
+        "BYMC": [
+          "85",
+          "105"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787572648,
+  "requirement_id": ""
+}
