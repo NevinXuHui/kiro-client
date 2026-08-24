@@ -82,7 +82,7 @@ AWS Builder ID 注册共 15 步，由 `Registrar.Run()` 驱动，任一步失败
 │  │ 传输层：tls-client（Chrome_144 指纹）              │    │
 │  │ 应用层：waf/chromedp → Edge 内核（Chromium）       │    │
 │  │        真实页面上下文执行关键请求（WAF 绕过）        │    │
-│  │ 收码层：email 包（Outlook API / CloudMail API）    │    │
+│  │ 收码层：email 包（Outlook / HTTP API / CloudMail）    │    │
 │  └─────────────────────────────────────────────────┘    │
 └─────────────────────────┬───────────────────────────────┘
                           │
@@ -102,6 +102,7 @@ AWS Builder ID 注册共 15 步，由 `Registrar.Run()` 驱动，任一步失败
     ▼
 校验配置（数量/并发/延迟/邮箱源）
     │  Outlook：邮箱池非空？
+    │  HTTP API：邮箱池非空？
     │  CloudMail：域名池非空？配置非空？
     ├── 否 ──► 终止任务
     ▼

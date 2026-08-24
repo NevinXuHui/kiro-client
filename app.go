@@ -58,24 +58,34 @@ func (a *App) startup(ctx context.Context) {
 	a.healthStop = make(chan struct{})
 	go a.autoHealthRefreshLoop()
 	// 系统托盘：关窗口隐藏到托盘，托盘菜单可恢复窗口或退出
-	go a.initTray()
+	a.initTray()
 }
 
-// initTray 启动系统托盘（energye/systray，Wails v2 无内置托盘 API）
+// initTray 启动系统托盘。
+// Windows：energye/systray 自建消息循环，可在 goroutine 中 Run。
+// Darwin：禁止 systray.Run / RunWithExternalLoop——前者二次 [NSApp run] 会 SIGTRAP，
+// 后者会抢走 Wails 的 NSApplication.delegate。改用原生 NSStatusItem。
 func (a *App) initTray() {
-	systray.Run(func() {
-		systray.SetIcon(appIconBytes)
-		systray.SetTitle("Kiro Client")
-		systray.SetTooltip("Kiro Client")
-		show := systray.AddMenuItem("显示窗口", "显示主窗口")
-		systray.AddSeparator()
-		quit := systray.AddMenuItem("退出", "退出 Kiro Client")
-		show.Click(func() { a.ShowWindow() })
-		quit.Click(func() {
-			systray.Quit()
-			wailsRuntime.Quit(a.ctx)
-		})
-	}, func() {})
+	if runtime.GOOS == "darwin" {
+		startDarwinTray(a)
+		setDarwinTrayIcon(appIconPNG)
+		return
+	}
+	go func() {
+		systray.Run(func() {
+			systray.SetIcon(appIconBytes)
+			systray.SetTitle("Kiro Client")
+			systray.SetTooltip("Kiro Client")
+			show := systray.AddMenuItem("显示窗口", "显示主窗口")
+			systray.AddSeparator()
+			quit := systray.AddMenuItem("退出", "退出 Kiro Client")
+			show.Click(func() { a.ShowWindow() })
+			quit.Click(func() {
+				systray.Quit()
+				wailsRuntime.Quit(a.ctx)
+			})
+		}, func() {})
+	}()
 }
 
 // shutdown — Wails 生命周期：窗口关闭前调用
@@ -330,6 +340,9 @@ func manualAddToPool(result map[string]interface{}) {
 		Region:       "us-east-1",
 		Time:         time.Now().Format("2006-01-02 15:04:05"),
 	}
+	if pw, _ := result["password"].(string); pw != "" {
+		acc.Password = pw
+	}
 	if verify, ok := result["verify"].(map[string]interface{}); ok {
 		if v, ok := verify["credit_used"].(float64); ok {
 			acc.CreditUsed = int(v)
@@ -441,6 +454,23 @@ func (a *App) ClearRegisteredOutlookAccounts() map[string]interface{} {
 }
 func (a *App) ImportOutlookFile(path string) map[string]interface{} {
 	return email.ImportOutlookFile(path)
+}
+
+// ===== HTTP API 邮箱 =====
+
+func (a *App) GetHttpAPIAccounts() []map[string]interface{} { return storage.GetHttpAPICached() }
+func (a *App) AddHttpAPIAccounts(data string) map[string]interface{} {
+	return email.AddHttpAPIAccounts(data)
+}
+func (a *App) DeleteHttpAPIAccount(addr string) map[string]interface{} {
+	return email.DeleteHttpAPIAccount(addr)
+}
+func (a *App) ClearHttpAPIAccounts() map[string]interface{} { return email.ClearHttpAPIAccounts() }
+func (a *App) ClearRegisteredHttpAPIAccounts() map[string]interface{} {
+	return email.ClearRegisteredHttpAPIAccounts()
+}
+func (a *App) ImportHttpAPIFile(path string) map[string]interface{} {
+	return email.ImportHttpAPIFile(path)
 }
 
 // ===== CloudMail =====
@@ -1011,6 +1041,78 @@ func (a *App) ImportToDefaultPool(filePath string) map[string]interface{} {
 	var m map[string]interface{}
 	json.Unmarshal(b, &m)
 	return m
+}
+
+// ExportPoolAccounts 弹出保存对话框，把号池账号写成卡密 JSON（WKWebView 不支持 <a download>）
+func (a *App) ExportPoolAccounts(poolID string) map[string]interface{} {
+	mgr := pool.GetManager(storage.GetDataDir())
+	p, err := mgr.Get(poolID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	if len(p.Accounts) == 0 {
+		return map[string]interface{}{"error": "暂无账号可导出"}
+	}
+	data, err := pool.ExportAccountsJSON(p.Accounts)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	name := "kiro-accounts-" + time.Now().Format("2006-01-02") + ".json"
+	result := a.saveExportedJSON(name, data)
+	if result["success"] == true {
+		result["count"] = len(p.Accounts)
+	}
+	return result
+}
+
+// ExportPoolAccount 导出号池中的单个账号
+func (a *App) ExportPoolAccount(poolID, email string) map[string]interface{} {
+	mgr := pool.GetManager(storage.GetDataDir())
+	p, err := mgr.Get(poolID)
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	var acc *pool.Account
+	for _, item := range p.Accounts {
+		if item.Email == email {
+			acc = item
+			break
+		}
+	}
+	if acc == nil {
+		return map[string]interface{}{"error": "账号不存在"}
+	}
+	data, err := pool.ExportAccountsJSON([]*pool.Account{acc})
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return a.saveExportedJSON(pool.SanitizeFilename(acc.Email)+".json", data)
+}
+
+func (a *App) saveExportedJSON(defaultFilename string, data []byte) map[string]interface{} {
+	if a.ctx == nil {
+		return map[string]interface{}{"error": "app not ready"}
+	}
+	path, err := wailsRuntime.SaveFileDialog(a.ctx, wailsRuntime.SaveDialogOptions{
+		Title:           "导出账号",
+		DefaultFilename: defaultFilename,
+		Filters: []wailsRuntime.FileFilter{
+			{DisplayName: "JSON (*.json)", Pattern: "*.json"},
+		},
+	})
+	if err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	if path == "" {
+		return map[string]interface{}{"cancelled": true}
+	}
+	if !strings.HasSuffix(strings.ToLower(path), ".json") {
+		path += ".json"
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		return map[string]interface{}{"error": err.Error()}
+	}
+	return map[string]interface{}{"success": true, "path": path}
 }
 
 // AddAccountToPool 添加单个账号到号池（注册后调用）
