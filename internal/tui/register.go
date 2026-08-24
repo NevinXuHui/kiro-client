@@ -125,13 +125,29 @@ func (v *RegisterView) Update(msg tea.Msg) (*RegisterView, tea.Cmd) {
 			}
 
 		case "1", "2", "3":
-			// 切换邮箱源
-			if msg.String() == "1" {
-				v.emailSource = 0
-			} else if msg.String() == "2" {
-				v.emailSource = 1
-			} else if msg.String() == "3" {
-				v.emailSource = 2
+			// 切换邮箱源（仅在不聚焦输入框时）
+			if v.focusIndex >= len(v.inputs) {
+				if msg.String() == "1" {
+					v.emailSource = 0
+				} else if msg.String() == "2" {
+					v.emailSource = 1
+				} else if msg.String() == "3" {
+					v.emailSource = 2
+				}
+			}
+
+		case "left", "right", "h", "l":
+			// 左右键切换邮箱源
+			if msg.String() == "left" || msg.String() == "h" {
+				v.emailSource--
+				if v.emailSource < 0 {
+					v.emailSource = 2
+				}
+			} else {
+				v.emailSource++
+				if v.emailSource > 2 {
+					v.emailSource = 0
+				}
 			}
 		}
 
@@ -177,7 +193,7 @@ func (v *RegisterView) View() string {
 	}
 
 	// 帮助
-	help := "Tab: 切换  Enter: 开始/停止  1/2/3: 切换邮箱源  ESC: 返回  q: 退出"
+	help := "Tab: 切换  ←/→: 切换邮箱源  Enter: 开始/停止  ESC: 返回  q: 退出"
 	s.WriteString(RenderHelp(help))
 
 	return s.String()
@@ -187,21 +203,29 @@ func (v *RegisterView) View() string {
 func (v *RegisterView) renderForm() string {
 	var s strings.Builder
 
-	// 邮箱源选择
-	s.WriteString(lipgloss.NewStyle().Bold(true).Render("邮箱源:") + "\n")
+	// 邮箱源选择（带高亮边框）
+	emailSourceBox := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(ColorPrimary).
+		Padding(0, 1).
+		MarginBottom(1)
+
+	var sourcesStr strings.Builder
+	sourcesStr.WriteString(lipgloss.NewStyle().Bold(true).Render("邮箱源 (←/→ 切换):") + "\n\n")
 	sources := []string{"Outlook", "CloudMail", "HttpAPI"}
 	for i, src := range sources {
 		prefix := "  "
 		style := lipgloss.NewStyle()
 		if i == v.emailSource {
-			prefix = "● "
+			prefix = "▶ "
 			style = style.Foreground(ColorPrimary).Bold(true)
 		} else {
-			prefix = "○ "
+			prefix = "  "
 			style = style.Foreground(ColorMuted)
 		}
 		s.WriteString(prefix + style.Render(fmt.Sprintf("[%d] %s", i+1, src)) + "\n")
 	}
+	s.WriteString(emailSourceBox.Render(sourcesStr.String()) + "\n")
 	s.WriteString("\n")
 
 	// 配置输入
