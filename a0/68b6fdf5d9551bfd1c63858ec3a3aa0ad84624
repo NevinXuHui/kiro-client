@@ -1,0 +1,137 @@
+frontend/js/accounts.js
+  ef2d8723cc314534 37-38,49-51
+frontend/js/i18n.js
+  ef2d8723cc314534 85,90,265-267,269
+  1d6eb96a5176dd88 268
+frontend/index.html
+  ef2d8723cc314534 473-476,556-559,608-611,932-933,935
+frontend/js/pools.js
+  1d6eb96a5176dd88 782-784,788-800,803,810-821
+  ef2d8723cc314534 511-515,785,801-802,804-809
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "a068b6fdf5d9551bfd1c63858ec3a3aa0ad84624",
+  "prompts": {
+    "1d6eb96a5176dd88": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36581df8-5a95-4cda-a10a-5f530128a5ab",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 30,
+      "overriden_lines": 0
+    },
+    "ae615b658894cdd8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28439f9d-9fea-48b7-ba7f-12496b79567b",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "ef2d8723cc314534": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e4058ee-4839-4bf7-9378-326803801b7f",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 217,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 290,
+    "git_diff_deleted_lines": 77,
+    "ai_additions": 70,
+    "ai_accepted": 70,
+    "BYMC": 209,
+    "mixed_additions": 0,
+    "BYAC": 70,
+    "BYRC": 0,
+    "per_file": {
+      "frontend/index.html": {
+        "BYMC": [
+          "286-290",
+          "365",
+          "404-432",
+          "944-960"
+        ],
+        "BYAC": [
+          "473-476",
+          "556-559",
+          "608-611",
+          "932-933",
+          "935"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/accounts.js": {
+        "BYMC": [
+          "187-323"
+        ],
+        "BYAC": [
+          "37-38",
+          "49-51"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/app.js": {
+        "BYMC": [
+          "31-34",
+          "37",
+          "406"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "frontend/js/i18n.js": {
+        "BYMC": [
+          "82",
+          "86-87",
+          "102",
+          "104-109"
+        ],
+        "BYAC": [
+          "85",
+          "90",
+          "265-269"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/pools.js": {
+        "BYMC": [],
+        "BYAC": [
+          "511-515",
+          "782-785",
+          "788-821"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/ui.js": {
+        "BYMC": [
+          "123-124",
+          "283-284"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787572641,
+  "requirement_id": ""
+}
