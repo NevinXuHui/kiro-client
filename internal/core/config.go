@@ -30,6 +30,9 @@ type Config struct {
 	UseOutlook     bool
 	OutlookAccount *email.OutlookAccount
 
+	UseHttpAPI     bool
+	HttpAPIAccount *email.HttpAPIAccount
+
 	UseCloudMail      bool
 	CloudMailConfig   *email.CloudMailConfig
 	CloudMailProvider *email.CloudMailProvider
@@ -76,4 +79,3 @@ func GenPassword() string {
 	rand.Shuffle(len(pw), func(i, j int) { pw[i], pw[j] = pw[j], pw[i] })
 	return string(pw)
 }
-

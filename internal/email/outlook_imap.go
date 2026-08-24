@@ -20,138 +20,222 @@ import (
 )
 
 // OutlookAccount Outlook 邮箱账号
+// 卡密两种顺序均支持：
+//
+//	email----密码----clientid----refresh_token
+//	email----密码----refresh_token----clientid
 type OutlookAccount struct {
 	Email        string
 	Password     string
 	ClientID     string
 	RefreshToken string
+	AccessToken  string
 }
 
-// ParseOutlookCSV 解析 outlook.csv
+var outlookClientIDRe = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
+
+func looksLikeOutlookClientID(s string) bool {
+	return outlookClientIDRe.MatchString(s)
+}
+
+func looksLikeOutlookRefresh(s string) bool {
+	if s == "" {
+		return false
+	}
+	if strings.HasPrefix(s, "M.") || strings.HasPrefix(s, "0.A") {
+		return true
+	}
+	return len(s) >= 80
+}
+
+// classifyClientAndRefresh 识别 clientid / refresh_token 顺序。
+// UUID → clientid；M. 前缀或超长串 → refresh_token；无法判断时保持传入顺序。
+func classifyClientAndRefresh(a, b string) (clientID, refresh string) {
+	aID, bID := looksLikeOutlookClientID(a), looksLikeOutlookClientID(b)
+	switch {
+	case aID && !bID:
+		return a, b
+	case bID && !aID:
+		return b, a
+	}
+	aRT, bRT := looksLikeOutlookRefresh(a), looksLikeOutlookRefresh(b)
+	switch {
+	case aRT && !bRT:
+		return b, a
+	case bRT && !aRT:
+		return a, b
+	default:
+		return a, b
+	}
+}
+
+// parseOutlookLine 解析一行卡密（clientid / refresh_token 两种顺序均可）
+func parseOutlookLine(line string) (OutlookAccount, bool) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return OutlookAccount{}, false
+	}
+	parts := strings.Split(line, "----")
+	if len(parts) < 4 {
+		return OutlookAccount{}, false
+	}
+	clientID, refresh := classifyClientAndRefresh(strings.TrimSpace(parts[2]), strings.TrimSpace(parts[3]))
+	acc := OutlookAccount{
+		Email:        strings.TrimSpace(parts[0]),
+		Password:     strings.TrimSpace(parts[1]),
+		ClientID:     clientID,
+		RefreshToken: refresh,
+	}
+	if len(parts) >= 5 {
+		acc.AccessToken = strings.TrimSpace(parts[4])
+	}
+	if acc.Email == "" || !strings.Contains(acc.Email, "@") || acc.ClientID == "" || acc.RefreshToken == "" {
+		return OutlookAccount{}, false
+	}
+	return acc, true
+}
+
+// ParseOutlookCSV 解析 outlook.csv / txt（每行一条卡密）
 func ParseOutlookCSV(path string) ([]OutlookAccount, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-
-	var accounts []OutlookAccount
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
-		parts := strings.SplitN(line, "----", 4)
-		if len(parts) != 4 {
-			log.Printf("跳过格式错误的行: %s", line[:min(50, len(line))])
-			continue
-		}
-		accounts = append(accounts, OutlookAccount{
-			Email:        parts[0],
-			Password:     parts[1],
-			ClientID:     parts[2],
-			RefreshToken: parts[3],
-		})
-	}
-	return accounts, nil
+	return ParseOutlookLines(string(data)), nil
 }
 
-// ParseOutlookLines 从文本内容直接解析 Outlook 账号 (Web UI 使用)
-// 支持两种格式:
-// 1. 换行分隔: 每行一个账号
-// 2. 空格分隔: 账号之间用空格隔开
+// ParseOutlookLines 从文本解析 Outlook 账号。
+// 换行分隔优先；单行时再按空白拆多条卡密。
 func ParseOutlookLines(data string) []OutlookAccount {
-	var accounts []OutlookAccount
 	data = strings.TrimSpace(data)
 	if data == "" {
-		return accounts
+		return nil
 	}
-
-	// 先尝试按换行分割
 	lines := strings.Split(data, "\n")
-
-	// 如果只有一行，可能是空格分隔的格式
 	if len(lines) == 1 {
-		// 尝试按空格分割（账号格式: email----password----clientid----token）
-		// 每个账号以空格结尾，下一个账号开始
-		parts := strings.Fields(data) // Fields 会按空白字符分割并去除空白
-		for _, part := range parts {
-			part = strings.TrimSpace(part)
-			if part == "" {
-				continue
+		parts := strings.Fields(data)
+		if len(parts) > 1 {
+			var accounts []OutlookAccount
+			for _, part := range parts {
+				if acc, ok := parseOutlookLine(part); ok {
+					accounts = append(accounts, acc)
+				}
 			}
-			fields := strings.SplitN(part, "----", 4)
-			if len(fields) == 4 {
-				accounts = append(accounts, OutlookAccount{
-					Email:        strings.TrimSpace(fields[0]),
-					Password:     strings.TrimSpace(fields[1]),
-					ClientID:     strings.TrimSpace(fields[2]),
-					RefreshToken: strings.TrimSpace(fields[3]),
-				})
+			if len(accounts) > 0 {
+				return accounts
 			}
 		}
-	} else {
-		// 多行格式，按行解析
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
+		if acc, ok := parseOutlookLine(lines[0]); ok {
+			return []OutlookAccount{acc}
+		}
+		return nil
+	}
+	var accounts []OutlookAccount
+	for _, line := range lines {
+		if acc, ok := parseOutlookLine(line); ok {
+			accounts = append(accounts, acc)
+		} else if strings.TrimSpace(line) != "" {
+			preview := line
+			if len(preview) > 50 {
+				preview = preview[:50]
 			}
-			parts := strings.SplitN(line, "----", 4)
-			if len(parts) == 4 {
-				accounts = append(accounts, OutlookAccount{
-					Email:        strings.TrimSpace(parts[0]),
-					Password:     strings.TrimSpace(parts[1]),
-					ClientID:     strings.TrimSpace(parts[2]),
-					RefreshToken: strings.TrimSpace(parts[3]),
-				})
-			}
+			log.Printf("跳过格式错误的行: %s", preview)
 		}
 	}
-
 	return accounts
 }
 
-// RefreshOutlookToken 用 refresh_token 获取 access_token（优先走全局代理，失败时降级直连）
+// outlookTokenEndpoints 与常见卡密签发端对齐：先 common（不带 scope），再 consumers。
+var outlookTokenEndpoints = []string{
+	"https://login.microsoftonline.com/common/oauth2/v2.0/token",
+	"https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
+}
+
+// RefreshOutlookToken 用 refresh_token 换 access_token（优先走全局代理，失败时降级直连）
 func RefreshOutlookToken(acc OutlookAccount) (string, error) {
+	if acc.ClientID == "" || acc.RefreshToken == "" {
+		return "", fmt.Errorf("缺少 client_id 或 refresh_token，无法 OAuth2 收信")
+	}
 	form := url.Values{
 		"client_id":     {acc.ClientID},
 		"refresh_token": {acc.RefreshToken},
 		"grant_type":    {"refresh_token"},
-		"scope":         {"https://outlook.office.com/IMAP.AccessAsUser.All offline_access"},
 	}
+	body := strings.NewReader(form.Encode())
 
 	proxyURL := storage.GetProxy()
-	tryPost := func(p string) (resp *http.Response, err error) {
-		client := httpClientWithProxy(p, 30*time.Second)
-		return client.Post(
-			"https://login.microsoftonline.com/consumers/oauth2/v2.0/token",
-			"application/x-www-form-urlencoded",
-			strings.NewReader(form.Encode()),
-		)
+	var lastErr error
+	for _, endpoint := range outlookTokenEndpoints {
+		token, newRT, err := postOutlookToken(endpoint, body, proxyURL)
+		if err != nil && proxyURL != "" {
+			log.Printf("[Outlook OAuth] 代理请求失败，降级直连：%v", err)
+			token, newRT, err = postOutlookToken(endpoint, strings.NewReader(form.Encode()), "")
+		}
+		if err != nil {
+			lastErr = err
+			body = strings.NewReader(form.Encode())
+			continue
+		}
+		if newRT != "" && newRT != acc.RefreshToken {
+			persistOutlookRefreshToken(acc.Email, newRT)
+		}
+		return token, nil
 	}
-	resp, err := tryPost(proxyURL)
-	if err != nil && proxyURL != "" {
-		log.Printf("[Outlook OAuth] 代理请求失败，降级直连：%v", err)
-		resp, err = tryPost("")
+	if lastErr != nil {
+		return "", lastErr
 	}
+	return "", fmt.Errorf("刷新 Outlook Token 失败")
+}
+
+func postOutlookToken(endpoint string, body *strings.Reader, proxyURL string) (accessToken, newRefresh string, err error) {
+	req, err := http.NewRequest(http.MethodPost, endpoint, body)
 	if err != nil {
-		return "", fmt.Errorf("请求失败: %v", err)
+		return "", "", err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded;charset=UTF-8")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36")
+
+	client := httpClientWithProxy(proxyURL, 30*time.Second)
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", fmt.Errorf("请求失败: %v", err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-
-	if resp.StatusCode != 200 {
-		return "", fmt.Errorf("刷新失败 %d: %s", resp.StatusCode, string(body[:min(300, len(body))]))
-	}
+	raw, _ := io.ReadAll(resp.Body)
 
 	var result map[string]interface{}
-	json.Unmarshal(body, &result)
+	_ = json.Unmarshal(raw, &result)
+	if desc, _ := result["error_description"].(string); strings.Contains(desc, "service abuse mode") {
+		return "", "", fmt.Errorf("账号已被封禁或凭据无效")
+	}
+	if resp.StatusCode != 200 {
+		preview := string(raw)
+		if len(preview) > 300 {
+			preview = preview[:300]
+		}
+		return "", "", fmt.Errorf("刷新失败 %d: %s", resp.StatusCode, preview)
+	}
 	token, _ := result["access_token"].(string)
 	if token == "" {
-		return "", fmt.Errorf("响应中无 access_token")
+		return "", "", fmt.Errorf("响应中无 access_token")
 	}
-	return token, nil
+	newRT, _ := result["refresh_token"].(string)
+	return token, newRT, nil
+}
+
+func persistOutlookRefreshToken(email, refresh string) {
+	if email == "" || refresh == "" {
+		return
+	}
+	storage.ModifyAccountsCached(func(accounts []map[string]interface{}) []map[string]interface{} {
+		for i, acc := range accounts {
+			if acc["email"] == email {
+				accounts[i]["refreshToken"] = refresh
+				break
+			}
+		}
+		return accounts
+	})
 }
 
 // buildXOAuth2 构建 XOAUTH2 认证字符串

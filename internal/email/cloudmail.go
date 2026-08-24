@@ -22,12 +22,45 @@ type CloudMailConfig struct {
 	Domains  []string `json:"domains"`  // 服务器允许的域名列表（与 env.domain 对齐）
 }
 
+// tokenSlot 同一台 Cloud-Mail（URL+管理员）共享一份 token。
+// 服务端 genToken 会覆盖旧 token，多任务各自登录会把别人踢下线。
+type tokenSlot struct {
+	mu    sync.Mutex
+	token string
+}
+
+var (
+	tokenCache   = map[string]*tokenSlot{}
+	tokenCacheMu sync.Mutex
+)
+
+func tokenCacheKey(cfg CloudMailConfig) string {
+	return strings.ToLower(strings.TrimRight(cfg.URL, "/")) + "\x00" + strings.ToLower(strings.TrimSpace(cfg.Email))
+}
+
+func slotFor(cfg CloudMailConfig) *tokenSlot {
+	key := tokenCacheKey(cfg)
+	tokenCacheMu.Lock()
+	defer tokenCacheMu.Unlock()
+	if s := tokenCache[key]; s != nil {
+		return s
+	}
+	s := &tokenSlot{}
+	tokenCache[key] = s
+	return s
+}
+
+func resetCloudMailTokenCache() {
+	tokenCacheMu.Lock()
+	tokenCache = map[string]*tokenSlot{}
+	tokenCacheMu.Unlock()
+}
+
 // CloudMailClient cloud-mail HTTP 客户端
 type CloudMailClient struct {
-	config  CloudMailConfig
-	client  *http.Client
-	token   string
-	tokenMu sync.Mutex
+	config CloudMailConfig
+	client *http.Client
+	slot   *tokenSlot
 }
 
 // CloudMailMessage 邮件信息（与 /api/public/emailList 响应对齐）
@@ -57,11 +90,24 @@ func NewCloudMailClient(config CloudMailConfig) *CloudMailClient {
 	return &CloudMailClient{
 		config: config,
 		client: &http.Client{Timeout: 20 * time.Second},
+		slot:   slotFor(config),
 	}
 }
 
-// GenToken 通过 /api/public/genToken 获取并缓存 token
+func (c *CloudMailClient) currentToken() string {
+	c.slot.mu.Lock()
+	defer c.slot.mu.Unlock()
+	return c.slot.token
+}
+
+// GenToken 通过 /api/public/genToken 获取并写入共享缓存
 func (c *CloudMailClient) GenToken() error {
+	c.slot.mu.Lock()
+	defer c.slot.mu.Unlock()
+	return c.genTokenLocked()
+}
+
+func (c *CloudMailClient) genTokenLocked() error {
 	body, _ := json.Marshal(map[string]string{
 		"email":    c.config.Email,
 		"password": c.config.Password,
@@ -99,65 +145,80 @@ func (c *CloudMailClient) GenToken() error {
 		return fmt.Errorf("genToken 未返回 token: %s", string(wrap.Data))
 	}
 
-	c.tokenMu.Lock()
-	c.token = data.Token
-	c.tokenMu.Unlock()
+	c.slot.token = data.Token
 	return nil
 }
 
-// ensureToken 确保已有 token，没有就生成
+// ensureToken 已有共享 token 就复用，没有才登录一次
 func (c *CloudMailClient) ensureToken() error {
-	c.tokenMu.Lock()
-	hasToken := c.token != ""
-	c.tokenMu.Unlock()
-	if hasToken {
+	c.slot.mu.Lock()
+	defer c.slot.mu.Unlock()
+	if c.slot.token != "" {
 		return nil
 	}
-	return c.GenToken()
+	return c.genTokenLocked()
 }
 
-// doAuthorized 调用需要鉴权的接口，遇 401 自动 GenToken 重试一次
+func unauthorized(httpStatus int, body []byte) bool {
+	if httpStatus == 401 {
+		return true
+	}
+	var wrap cloudMailResp
+	if err := json.Unmarshal(body, &wrap); err != nil {
+		return false
+	}
+	return wrap.Code == 401
+}
+
+// doAuthorized 调用需要鉴权的接口。HTTP/业务 401 时刷新共享 token 再试一次。
 func (c *CloudMailClient) doAuthorized(path string, payload interface{}) ([]byte, error) {
 	if err := c.ensureToken(); err != nil {
 		return nil, err
 	}
 
-	doOnce := func() (*http.Response, []byte, error) {
+	doOnce := func() (int, string, []byte, error) {
 		body, _ := json.Marshal(payload)
 		url := strings.TrimRight(c.config.URL, "/") + path
 		req, err := http.NewRequest("POST", url, bytes.NewReader(body))
 		if err != nil {
-			return nil, nil, err
+			return 0, "", nil, err
 		}
-		c.tokenMu.Lock()
-		tok := c.token
-		c.tokenMu.Unlock()
+		tok := c.currentToken()
 		req.Header.Set("Authorization", tok)
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := c.client.Do(req)
 		if err != nil {
-			return nil, nil, err
+			return 0, tok, nil, err
 		}
 		defer resp.Body.Close()
 		bs, _ := io.ReadAll(resp.Body)
-		return resp, bs, nil
+		return resp.StatusCode, tok, bs, nil
 	}
 
-	resp, respBody, err := doOnce()
+	status, usedTok, respBody, err := doOnce()
 	if err != nil {
 		return nil, fmt.Errorf("%s 请求失败: %w", path, err)
 	}
-	if resp.StatusCode == 401 {
-		if err := c.GenToken(); err != nil {
-			return nil, fmt.Errorf("token 失效后重新登录失败: %w", err)
+	if unauthorized(status, respBody) {
+		c.slot.mu.Lock()
+		if c.slot.token == usedTok || c.slot.token == "" {
+			log.Printf("[CloudMail] token 失效，重新获取 (%s)", c.config.Email)
+			if err := c.genTokenLocked(); err != nil {
+				c.slot.mu.Unlock()
+				return nil, fmt.Errorf("token 失效后重新登录失败: %w", err)
+			}
 		}
-		resp, respBody, err = doOnce()
+		c.slot.mu.Unlock()
+		status, _, respBody, err = doOnce()
 		if err != nil {
 			return nil, fmt.Errorf("%s 重试失败: %w", path, err)
 		}
+		if unauthorized(status, respBody) {
+			return nil, fmt.Errorf("%s token 验证失败", path)
+		}
 	}
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("%s HTTP %d: %s", path, resp.StatusCode, string(respBody))
+	if status != 200 {
+		return nil, fmt.Errorf("%s HTTP %d: %s", path, status, string(respBody))
 	}
 	return respBody, nil
 }
@@ -233,10 +294,7 @@ func (c *CloudMailClient) GetWebsiteConfig() ([]string, error) {
 			return nil, err
 		}
 		if withToken {
-			c.tokenMu.Lock()
-			tok := c.token
-			c.tokenMu.Unlock()
-			if tok != "" {
+			if tok := c.currentToken(); tok != "" {
 				req.Header.Set("Authorization", tok)
 			}
 		}
@@ -280,10 +338,7 @@ func (c *CloudMailClient) GetWebsiteConfig() ([]string, error) {
 		return domains, nil
 	}
 	// 空返回：尝试带 token 重试一次
-	c.tokenMu.Lock()
-	hasTok := c.token != ""
-	c.tokenMu.Unlock()
-	if hasTok {
+	if c.currentToken() != "" {
 		if d2, err2 := fetch(true); err2 == nil && len(d2) > 0 {
 			return d2, nil
 		}
@@ -294,7 +349,7 @@ func (c *CloudMailClient) GetWebsiteConfig() ([]string, error) {
 // TestConnection 测试：genToken + websiteConfig + 轻量 emailList。
 // 返回拉取到的域名列表（可能为空，表示服务器开启了 loginDomain 隐私开关）。
 func (c *CloudMailClient) TestConnection() ([]string, error) {
-	if err := c.GenToken(); err != nil {
+	if err := c.ensureToken(); err != nil {
 		return nil, err
 	}
 	domains, err := c.GetWebsiteConfig()
