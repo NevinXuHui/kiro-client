@@ -232,7 +232,7 @@ func (r *Registrar) Run() map[string]interface{} {
 			return map[string]interface{}{"status": "failed", "error": friendlyErr, "email": r.Email}
 		}
 	} else {
-		if r.Cfg.UseOutlook {
+		if r.Cfg.UseOutlook || r.Cfg.UseHttpAPI {
 			log.Printf("%s 邮箱已被注册", prefix)
 			return map[string]interface{}{"status": "failed", "error": "邮箱已注册过，跳过", "email": r.Email}
 		}
@@ -341,11 +341,18 @@ func (r *Registrar) Run() map[string]interface{} {
 	}
 
 	alive, _ := verify["alive"].(bool)
-	if alive {
-		log.Printf("%s 注册成功", prefix)
-	} else {
-		log.Printf("%s 注册完成", prefix)
+	if !alive {
+		errMsg, _ := verify["error"].(string)
+		if errMsg == "" {
+			errMsg = "验活失败"
+		}
+		log.Printf("%s 验活失败: %s", prefix, errMsg)
+		return map[string]interface{}{
+			"status": "failed", "error": errMsg, "email": r.Email,
+			"passwordSet": true, "verify": verify,
+		}
 	}
+	log.Printf("%s 注册成功", prefix)
 
 	return map[string]interface{}{
 		"email":         r.Email,

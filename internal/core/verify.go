@@ -15,11 +15,10 @@ import (
 
 // VerifyAlive 验活: 刷新 Token + 查用量 + 查模型。
 //
-// 判死逻辑（v2）：
-//   - Token 刷新成功（200）→ 账号存活，即使 Q 端点暂时不可达也返回 alive
-//   - Token 刷新返回 401/403 → 账号确实已吊销/封禁，返回 suspended
-//   - Q 端点（getUsageLimits / ListAvailableModels）403 → 仅 warn，不阻断
-//     新注册账号 Q 侧 profile 可能尚未同步，或出口 IP 被 Q 风控，不等同于封号
+// 判死逻辑：
+//   - Token 刷新返回 401/403 → 账号已吊销/封禁，返回 suspended
+//   - Q 端点（getUsageLimits / ListAvailableModels）出现一次 403 → 注册失败
+//   - Token 刷新成功且 Q 端点非 403 → 账号存活
 func (r *Registrar) VerifyAlive(awsToken map[string]interface{}) map[string]interface{} {
 	log.Println("[验活] 刷新 Token + 查用量")
 	client := httputil.NewTLSClient(r.Cfg.Proxy, true, r.Identity.ChromeVer)
@@ -59,24 +58,28 @@ func (r *Registrar) VerifyAlive(awsToken map[string]interface{}) map[string]inte
 	expiresIn, _ := tok["expiresIn"].(float64)
 	log.Printf("Token 刷新成功, expiresIn=%ds", int(expiresIn))
 
-	// Q 端点查询（非致命：新号/IP 风控可能导致 403，不等同于封号）
 	usageURL := "https://q.us-east-1.amazonaws.com/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST&isEmailRequired=true"
 	usageRes := queryGetEndpointWithRetry(client, access, usageURL)
+	if usageRes.statusCode == 403 {
+		return map[string]interface{}{"alive": false, "error": "Q 端点 403 [usage]"}
+	}
 	if !usageRes.ok {
 		log.Printf("[验活] getUsageLimits 不可达 (status=%d)，跳过用量查询", usageRes.statusCode)
 	}
 
 	modelRes := queryGetEndpointWithRetry(client, access, "https://q.us-east-1.amazonaws.com/ListAvailableModels?origin=AI_EDITOR")
+	if modelRes.statusCode == 403 {
+		return map[string]interface{}{"alive": false, "error": "Q 端点 403 [models]"}
+	}
 	if !modelRes.ok {
 		log.Printf("[验活] ListAvailableModels 不可达 (status=%d)，跳过模型查询", modelRes.statusCode)
 	}
 
-	// Token 刷新成功 = 账号存活。Q 端点不可达不影响此判定。
 	if usageRes.ok && len(usageRes.body) > 0 {
 		return r.parseUsage(usageRes.body)
 	}
 
-	log.Println("[验活] Token 有效，Q 端点暂不可达（新号同步中或 IP 风控），账号仍视为存活")
+	log.Println("[验活] Token 有效，Q 端点暂不可达，账号仍视为存活")
 	return map[string]interface{}{
 		"alive":          true,
 		"token_valid":    true,
@@ -93,7 +96,7 @@ type endpointResult struct {
 func checkEndpointResponse(url string, statusCode int, body []byte) endpointResult {
 	label := endpointLabel(url)
 	if statusCode == 403 {
-		log.Printf("[验活] Q 端点 403 [%s]（可能为新号同步延迟或 IP 风控，不视为封号）", label)
+		log.Printf("[验活] Q 端点 403 [%s]，注册失败", label)
 		return endpointResult{statusCode: statusCode}
 	}
 	if statusCode != 200 {
@@ -120,7 +123,7 @@ func endpointLabel(url string) string {
 }
 
 // queryGetEndpointWithRetry 带重试的 GET 端点查询。
-// 新注册账号 Q 端点可能暂时 403（profile 同步延迟），重试 3 次，间隔 10s。
+// 网络错误最多重试 3 次；403 立即返回，不重试。
 func queryGetEndpointWithRetry(client interface {
 	Do(req *fhttp.Request) (*fhttp.Response, error)
 }, access, url string) endpointResult {
@@ -152,11 +155,7 @@ func queryGetEndpointWithRetry(client interface {
 		if lastRes.ok {
 			return lastRes
 		}
-
-		// 非 403 的错误不重试（如 400/404/500 重试无意义）
-		if resp.StatusCode != 403 {
-			break
-		}
+		break
 	}
 	return lastRes
 }

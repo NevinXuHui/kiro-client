@@ -79,11 +79,18 @@ func (r *Registrar) ManualRegister() map[string]interface{} {
 		}
 	}
 	alive, _ := verify["alive"].(bool)
-	if alive {
-		log.Printf("%s 注册成功", prefix)
-	} else {
-		log.Printf("%s 注册完成", prefix)
+	if !alive {
+		errMsg, _ := verify["error"].(string)
+		if errMsg == "" {
+			errMsg = "验活失败"
+		}
+		log.Printf("%s 验活失败: %s", prefix, errMsg)
+		return map[string]interface{}{
+			"status": "failed", "error": errMsg, "email": r.Email,
+			"passwordSet": true, "verify": verify,
+		}
 	}
+	log.Printf("%s 注册成功", prefix)
 
 	// email 兜底链：验活结果 → accessToken JWT。
 	// 手动注册用户自填邮箱，程序侧 r.Email 为空；验活降级路径（Q 端点不可达）
