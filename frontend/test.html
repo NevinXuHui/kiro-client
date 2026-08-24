@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web API 测试</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #e0e0e0; }
+    .test { margin: 20px 0; padding: 15px; border: 1px solid #444; border-radius: 5px; }
+    .test.success { border-color: #0f0; background: #001100; }
+    .test.fail { border-color: #f00; background: #110000; }
+    .test.pending { border-color: #ff0; background: #111100; }
+    h2 { margin-top: 0; }
+    pre { background: #000; padding: 10px; overflow-x: auto; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Kiro Client Web API 测试</h1>
+  
+  <button onclick="runAllTests()">运行所有测试</button>
+  <button onclick="location.reload()">重置</button>
+  
+  <div id="results"></div>
+
+  <script src="js/api.js"></script>
+  <script src="js/adapter.js"></script>
+  <script>
+    const results = document.getElementById('results');
+
+    function addTest(name, status, data) {
+      const div = document.createElement('div');
+      div.className = 'test ' + status;
+      div.innerHTML = `
+        <h2>${status === 'success' ? '✅' : status === 'fail' ? '❌' : '⏳'} ${name}</h2>
+        <pre>${JSON.stringify(data, null, 2)}</pre>
+      `;
+      results.appendChild(div);
+    }
+
+    async function runAllTests() {
+      results.innerHTML = '';
+      
+      // 测试 1: API 客户端初始化
+      addTest('API 客户端初始化', window.kiroAPI ? 'success' : 'fail', 
+        { initialized: !!window.kiroAPI });
+
+      // 测试 2: Wails 适配器初始化
+      addTest('Wails 适配器初始化', window.go ? 'success' : 'fail',
+        { initialized: !!window.go });
+
+      // 测试 3: 获取注册状态
+      try {
+        const status = await window.kiroAPI.getRegisterStatus();
+        addTest('获取注册状态 (API)', 'success', status);
+      } catch (err) {
+        addTest('获取注册状态 (API)', 'fail', { error: err.message });
+      }
+
+      // 测试 4: Wails 兼容 - GetOverview
+      try {
+        const overview = await window.go.main.App.GetOverview();
+        addTest('GetOverview (Wails 兼容)', 'success', overview);
+      } catch (err) {
+        addTest('GetOverview (Wails 兼容)', 'fail', { error: err.message });
+      }
+
+      // 测试 5: Wails 兼容 - GetTaskStatus
+      try {
+        const taskStatus = await window.go.main.App.GetTaskStatus();
+        addTest('GetTaskStatus (Wails 兼容)', 'success', taskStatus);
+      } catch (err) {
+        addTest('GetTaskStatus (Wails 兼容)', 'fail', { error: err.message });
+      }
+
+      // 测试 6: 获取号池列表
+      try {
+        const pools = await window.kiroAPI.getPoolsList();
+        addTest('获取号池列表 (API)', 'success', pools);
+      } catch (err) {
+        addTest('获取号池列表 (API)', 'fail', { error: err.message });
+      }
+
+      // 测试 7: Wails 兼容 - ListPools
+      try {
+        const pools = await window.go.main.App.ListPools();
+        addTest('ListPools (Wails 兼容)', 'success', pools);
+      } catch (err) {
+        addTest('ListPools (Wails 兼容)', 'fail', { error: err.message });
+      }
+
+      // 测试 8: 获取网关状态
+      try {
+        const gateway = await window.kiroAPI.getGatewayStatus();
+        addTest('获取网关状态 (API)', 'success', gateway);
+      } catch (err) {
+        addTest('获取网关状态 (API)', 'fail', { error: err.message });
+      }
+
+      // 测试 9: Wails 兼容 - ProxyStatus
+      try {
+        const proxyStatus = await window.go.main.App.ProxyStatus();
+        addTest('ProxyStatus (Wails 兼容)', 'success', proxyStatus);
+      } catch (err) {
+        addTest('ProxyStatus (Wails 兼容)', 'fail', { error: err.message });
+      }
+
+      // 测试 10: 代理配置 (localStorage)
+      try {
+        await window.go.main.App.SetProxy('http://127.0.0.1:7890');
+        const proxy = await window.go.main.App.GetProxy();
+        addTest('代理配置 (localStorage)', proxy === 'http://127.0.0.1:7890' ? 'success' : 'fail', { proxy });
+      } catch (err) {
+        addTest('代理配置 (localStorage)', 'fail', { error: err.message });
+      }
+
+      // 测试 11: WebSocket 连接
+      addTest('WebSocket 连接', window.kiroAPI.ws && window.kiroAPI.ws.readyState === WebSocket.OPEN ? 'success' : 'pending',
+        { readyState: window.kiroAPI.ws ? window.kiroAPI.ws.readyState : 'not initialized' });
+
+      console.log('✅ 所有测试完成');
+    }
+
+    // 页面加载后自动运行
+    window.addEventListener('load', () => {
+      setTimeout(runAllTests, 500);
+    });
+  </script>
+</body>
+</html>
