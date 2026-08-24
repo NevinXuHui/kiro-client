@@ -318,10 +318,6 @@ window.go = {
         // Web 版本暂不支持文件导入
         return { error: 'Web 版本暂不支持文件导入，请直接粘贴账号数据' };
       },
-        accounts = accounts.filter(acc => acc.email !== email);
-        localStorage.setItem('kiro_outlook_accounts', JSON.stringify(accounts));
-        return { success: true };
-      },
 
       // BatchAddProxyEntry 批量添加代理到 Wails adapter
 BatchAddProxyEntries: async function(urls, weight) {
