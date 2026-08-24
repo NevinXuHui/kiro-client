@@ -10,6 +10,7 @@ require (
 	github.com/chromedp/chromedp v0.16.0
 	github.com/energye/systray v1.0.3
 	github.com/google/uuid v1.6.0
+	github.com/gorilla/websocket v1.5.3
 	github.com/wailsapp/wails/v2 v2.14.0
 	golang.org/x/net v0.56.0
 )
@@ -32,7 +33,6 @@ require (
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0 // indirect
 	github.com/godbus/dbus/v5 v5.1.0 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/jchv/go-winloader v0.0.0-20210711035445-715c2860da7e // indirect
 	github.com/klauspost/compress v1.18.2 // indirect
 	github.com/labstack/echo/v4 v4.13.3 // indirect
