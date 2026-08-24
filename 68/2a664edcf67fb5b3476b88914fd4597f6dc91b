@@ -1,0 +1,161 @@
+internal/email/outlook_imap.go
+  ef2d8723cc314534 23-26,32,35-83,86-98,104,107-108,112,116-122,124-125,128-131,133-140,142,148-154,156-158,164,167-182,184-185,187-191,193,195-199,201,204,207-210,212-216,220,222-228,230-238
+internal/email/cloudmail.go
+  1d6eb96a5176dd88 25-58,61-63,93,97-103,105-110,148,152,154-156,159,162-173,179,184,186,191,195,198,202-209,211-212,220-221,352
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "682a664edcf67fb5b3476b88914fd4597f6dc91b",
+  "prompts": {
+    "1d6eb96a5176dd88": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36581df8-5a95-4cda-a10a-5f530128a5ab",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 118,
+      "overriden_lines": 0
+    },
+    "49e835e3e576d80a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb88561d-22b7-4446-ba13-f386ea62a9cd",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 92,
+      "overriden_lines": 0
+    },
+    "ae615b658894cdd8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28439f9d-9fea-48b7-ba7f-12496b79567b",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 41,
+      "overriden_lines": 0
+    },
+    "ef2d8723cc314534": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e4058ee-4839-4bf7-9378-326803801b7f",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 387,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 277,
+    "git_diff_deleted_lines": 127,
+    "ai_additions": 249,
+    "ai_accepted": 249,
+    "BYMC": 20,
+    "mixed_additions": 0,
+    "BYAC": 249,
+    "BYRC": 0,
+    "per_file": {
+      "internal/core/config.go": {
+        "BYMC": [
+          "33-35"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/core/registrar.go": {
+        "BYMC": [
+          "66-68",
+          "85-86",
+          "307",
+          "315-317"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/email/cloudmail.go": {
+        "BYMC": [
+          "216-218",
+          "297",
+          "341"
+        ],
+        "BYAC": [
+          "25-58",
+          "61-63",
+          "93",
+          "97-103",
+          "105-110",
+          "148",
+          "152",
+          "154-156",
+          "159",
+          "162-173",
+          "179",
+          "184",
+          "186",
+          "191",
+          "195",
+          "198",
+          "202-209",
+          "211-212",
+          "220-221",
+          "352"
+        ],
+        "BYRC": []
+      },
+      "internal/email/outlook_imap.go": {
+        "BYMC": [
+          "84-85",
+          "132"
+        ],
+        "BYAC": [
+          "23-26",
+          "32",
+          "35-83",
+          "86-98",
+          "104",
+          "107-108",
+          "112",
+          "116-122",
+          "124-125",
+          "128-131",
+          "133-140",
+          "142",
+          "148-154",
+          "156-158",
+          "164",
+          "167-182",
+          "184-185",
+          "187-191",
+          "193",
+          "195-199",
+          "201",
+          "204",
+          "207-210",
+          "212-216",
+          "220",
+          "222-228",
+          "230-238"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787572604,
+  "requirement_id": ""
+}
