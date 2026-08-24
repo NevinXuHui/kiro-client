@@ -181,6 +181,22 @@ window.go = {
         return { success: false, message: 'Not supported in web version' };
       },
 
+      // CloudMail 相关
+      GetCloudMailConfigs: async function() {
+        // Web 版本返回空配置
+        return [];
+      },
+
+      SaveCloudMailConfig: async function(config) {
+        // Web 版本暂不支持
+        return { success: false, message: 'Not supported in web version' };
+      },
+
+      DeleteCloudMailConfig: async function(domain) {
+        // Web 版本暂不支持
+        return { success: false, message: 'Not supported in web version' };
+      },
+
       // Outlook 账号相关
       GetOutlookAccounts: async function() {
         // 从 localStorage 读取

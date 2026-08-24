@@ -59,11 +59,13 @@ document.addEventListener('keydown', function(e) {
   // Ctrl+Enter 开始任务
   if (e.ctrlKey && e.key === 'Enter') {
     e.preventDefault();
-    if (!document.getElementById('btn-start').disabled) startTask();
+    const btnStart = document.getElementById('btn-start');
+    if (btnStart && !btnStart.disabled) startTask();
   }
   // Esc 停止任务
   if (e.key === 'Escape') {
-    if (!document.getElementById('btn-stop').disabled) stopTask();
+    const btnStop = document.getElementById('btn-stop');
+    if (btnStop && !btnStop.disabled) stopTask();
   }
 });
 
