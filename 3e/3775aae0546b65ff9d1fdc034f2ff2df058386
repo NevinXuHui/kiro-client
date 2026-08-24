@@ -1,0 +1,28 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "3e3775aae0546b65ff9d1fdc034f2ff2df058386",
+  "prompts": {},
+  "commit_stats": {
+    "git_diff_added_lines": 224,
+    "git_diff_deleted_lines": 0,
+    "ai_additions": 0,
+    "ai_accepted": 0,
+    "BYMC": 224,
+    "mixed_additions": 0,
+    "BYAC": 0,
+    "BYRC": 0,
+    "per_file": {
+      "docs/CONCURRENT_DELAY.md": {
+        "BYMC": [
+          "1-224"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787576185,
+  "requirement_id": ""
+}
