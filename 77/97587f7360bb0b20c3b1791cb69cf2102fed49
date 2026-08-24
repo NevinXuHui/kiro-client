@@ -1,0 +1,120 @@
+internal/pool/pool.go
+  ef2d8723cc314534 30,32-33,346,353-354
+internal/storage/storage.go
+  49e835e3e576d80a 445-529,531-533
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "7797587f7360bb0b20c3b1791cb69cf2102fed49",
+  "prompts": {
+    "1d6eb96a5176dd88": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36581df8-5a95-4cda-a10a-5f530128a5ab",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 30,
+      "overriden_lines": 0
+    },
+    "49e835e3e576d80a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb88561d-22b7-4446-ba13-f386ea62a9cd",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 88,
+      "overriden_lines": 0
+    },
+    "ae615b658894cdd8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28439f9d-9fea-48b7-ba7f-12496b79567b",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 41,
+      "overriden_lines": 0
+    },
+    "ef2d8723cc314534": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e4058ee-4839-4bf7-9378-326803801b7f",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 226,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 201,
+    "git_diff_deleted_lines": 29,
+    "ai_additions": 94,
+    "ai_accepted": 94,
+    "BYMC": 102,
+    "mixed_additions": 0,
+    "BYAC": 94,
+    "BYRC": 0,
+    "per_file": {
+      "internal/pool/pool.go": {
+        "BYMC": [],
+        "BYAC": [
+          "30",
+          "32-33",
+          "346",
+          "353-354"
+        ],
+        "BYRC": []
+      },
+      "internal/storage/storage.go": {
+        "BYMC": [
+          "22-28",
+          "322-326",
+          "328-330",
+          "530"
+        ],
+        "BYAC": [
+          "445-529",
+          "531-533"
+        ],
+        "BYRC": []
+      },
+      "internal/task/coordinator.go": {
+        "BYMC": [
+          "27",
+          "54",
+          "65-94",
+          "152",
+          "183",
+          "229-230",
+          "241",
+          "254-262",
+          "355-365",
+          "509",
+          "511-530",
+          "609-614",
+          "775-776"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787572628,
+  "requirement_id": ""
+}
