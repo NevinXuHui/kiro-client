@@ -17,6 +17,9 @@ var frontend embed.FS
 //go:embed build/windows/icon.ico
 var appIconBytes []byte
 
+//go:embed frontend/assets/appicon.png
+var appIconPNG []byte
+
 func main() {
 	app := NewApp()
 

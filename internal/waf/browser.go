@@ -5,6 +5,7 @@ package waf
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -19,7 +20,7 @@ var (
 )
 
 // findBrowser 按优先级定位系统上可用的 Chrome / Edge 可执行文件。
-// 顺序：环境变量 KIRO_BROWSER_PATH → Chrome（Program Files / 用户目录）→ Edge。
+// 顺序：KIRO_BROWSER_PATH → 当前 OS 常见安装路径 → PATH 中的裸命令名。
 // 找不到返回空串，调用方据此回退或报错。
 func findBrowser() string {
 	cacheOnce.Do(func() {
@@ -46,34 +47,28 @@ func locateBrowserOnce() string {
 }
 
 // candidatePaths 返回当前系统下 Chrome / Edge 的常见安装路径。
-// Windows 优先 Edge（实测系统有 Edge 无 Chrome）；同时给出 Chrome 备选。
 func candidatePaths() []string {
-	if runtime.GOOS != "windows" {
-		// 非 Windows：PATH 里的标准名称，以及 Linux/macOS 常见路径。
-		return []string{
-			"google-chrome",
-			"google-chrome-stable",
-			"chromium",
-			"chromium-browser",
-			"microsoft-edge",
-			"/usr/bin/google-chrome",
-			"/usr/bin/chromium",
-			"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-			"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-		}
+	switch runtime.GOOS {
+	case "windows":
+		return windowsCandidatePaths()
+	case "darwin":
+		return darwinCandidatePaths()
+	default:
+		return unixCandidatePaths()
 	}
+}
+
+func windowsCandidatePaths() []string {
 	prog := os.Getenv("ProgramFiles")
 	prog86 := os.Getenv("ProgramFiles(x86)")
 	local := os.Getenv("LOCALAPPDATA")
 	var paths []string
-	// Edge（当前系统确认存在）。
 	if prog86 != "" {
 		paths = append(paths, filepath.Join(prog86, "Microsoft", "Edge", "Application", "msedge.exe"))
 	}
 	if prog != "" {
 		paths = append(paths, filepath.Join(prog, "Microsoft", "Edge", "Application", "msedge.exe"))
 	}
-	// Chrome。
 	if prog != "" {
 		paths = append(paths, filepath.Join(prog, "Google", "Chrome", "Application", "chrome.exe"))
 	}
@@ -86,15 +81,49 @@ func candidatePaths() []string {
 	return paths
 }
 
-// isExecutable 判断路径存在且（对绝对路径而言）是一个可执行文件。
-// 对 PATH 中的裸名称（无路径分隔符）交给 exec.LookPath 在启动时处理，这里只验绝对路径。
+func darwinCandidatePaths() []string {
+	// 先查 .app 包内可执行文件。macOS 上 google-chrome 通常不在 PATH。
+	paths := []string{
+		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+		"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+		"/Applications/Chromium.app/Contents/MacOS/Chromium",
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		paths = append(paths,
+			filepath.Join(home, "Applications", "Google Chrome.app", "Contents", "MacOS", "Google Chrome"),
+			filepath.Join(home, "Applications", "Microsoft Edge.app", "Contents", "MacOS", "Microsoft Edge"),
+			filepath.Join(home, "Applications", "Chromium.app", "Contents", "MacOS", "Chromium"),
+		)
+	}
+	return append(paths, "google-chrome", "google-chrome-stable", "chromium", "microsoft-edge")
+}
+
+func unixCandidatePaths() []string {
+	return []string{
+		"google-chrome",
+		"google-chrome-stable",
+		"chromium",
+		"chromium-browser",
+		"microsoft-edge",
+		"/usr/bin/google-chrome",
+		"/usr/bin/google-chrome-stable",
+		"/usr/bin/chromium",
+		"/usr/bin/chromium-browser",
+		"/usr/bin/microsoft-edge",
+		"/snap/bin/chromium",
+	}
+}
+
+// isExecutable 判断路径存在且是一个可执行文件。
+// 裸命令名必须能在 PATH 中解析，否则 Linux 名（google-chrome）在 macOS
+// 上会被误判为可用，chromedp 启动时才报 executable file not found。
 func isExecutable(p string) bool {
 	if p == "" {
 		return false
 	}
-	// 裸名称（不含分隔符且非 Windows 绝对路径）→ 认为可用，由 chromedp 启动时解析。
 	if !filepath.IsAbs(p) && filepath.Base(p) == p {
-		return true
+		_, err := exec.LookPath(p)
+		return err == nil
 	}
 	info, err := os.Stat(p)
 	if err != nil {
