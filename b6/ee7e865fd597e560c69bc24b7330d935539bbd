@@ -1,0 +1,55 @@
+internal/tui/styles.go
+  e6c611d58b9d586b 1-183
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "b6ee7e865fd597e560c69bc24b7330d935539bbd",
+  "prompts": {
+    "e6c611d58b9d586b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4bb9589b-8b9f-4e64-8afe-67364947b4ea",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 183,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 188,
+    "git_diff_deleted_lines": 0,
+    "ai_additions": 183,
+    "ai_accepted": 183,
+    "BYMC": 5,
+    "mixed_additions": 0,
+    "BYAC": 183,
+    "BYRC": 0,
+    "per_file": {
+      "go.mod": {
+        "BYMC": [
+          "8",
+          "20",
+          "27",
+          "44",
+          "47"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/tui/styles.go": {
+        "BYMC": [],
+        "BYAC": [
+          "1-183"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787577458,
+  "requirement_id": ""
+}
