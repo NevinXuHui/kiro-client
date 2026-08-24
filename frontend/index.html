@@ -1014,7 +1014,13 @@
   <!-- 号池模态框 -->
   <!-- ===== Scripts ===== -->
   <script src="assets/lucide.min.js"></script>
-  <script src="wailsjs/runtime/init.js"></script>
+  <!-- Wails Runtime（仅 GUI 版本需要，Web 版本使用 adapter.js） -->
+  <script>
+    // Web 版本跳过 Wails Runtime
+    if (typeof window.wails === 'undefined') {
+      console.log('[Web] 使用 Wails Adapter 模式');
+    }
+  </script>
   <script src="js/i18n.js"></script>
   <script src="js/app.js"></script>
   <script src="js/ui.js"></script>
