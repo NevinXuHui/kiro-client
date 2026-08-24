@@ -1,6 +1,10 @@
 package tui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"fmt"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // 颜色定义
 var (
@@ -155,29 +159,8 @@ func RenderProgressBar(current, total int, width int) string {
 		bar += "░"
 	}
 
-	percentStr := lipgloss.NewStyle().
-		Foreground(ColorPrimary).
-		Render(lipgloss.NewStyle().Width(5).Align(lipgloss.Right).Render(
-			lipgloss.NewStyle().Bold(true).Render(
-				lipgloss.NewStyle().Render(
-					lipgloss.NewStyle().Render(
-						lipgloss.NewStyle().Render(
-							lipgloss.NewStyle().Render(
-								lipgloss.NewStyle().Render(
-									lipgloss.NewStyle().Render(
-										lipgloss.NewStyle().Render(
-											lipgloss.NewStyle().Render(
-												lipgloss.NewStyle().Render(
-													lipgloss.NewStyle().Render(
-														lipgloss.NewStyle().Render(
-															lipgloss.NewStyle().Render(
-																lipgloss.NewStyle().Render(
-																	lipgloss.NewStyle().Render(
-																		lipgloss.NewStyle().Render(
-																			lipgloss.NewStyle().Render(
-																				lipgloss.NewStyle().Render(
-																					lipgloss.NewStyle().Render(
-																						lipgloss.NewStyle().Render("")))))))))))))))))))))
+	percentStr := fmt.Sprintf("%.0f%%", percent*100)
 
 	return ProgressBarStyle.Render(bar) + " " + percentStr
 }
+
