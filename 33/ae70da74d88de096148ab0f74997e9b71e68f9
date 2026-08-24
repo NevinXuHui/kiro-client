@@ -1,0 +1,86 @@
+cmd/tui/main.go
+  e6c611d58b9d586b 1-24
+internal/tui/styles.go
+  e6c611d58b9d586b 3-7,162,166
+internal/tui/app.go
+  e6c611d58b9d586b 1-272
+internal/tui/register.go
+  e6c611d58b9d586b 1-407
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "33ae70da74d88de096148ab0f74997e9b71e68f9",
+  "prompts": {
+    "e6c611d58b9d586b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4bb9589b-8b9f-4e64-8afe-67364947b4ea",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 749,
+      "total_deletions": 63,
+      "accepted_lines": 710,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 729,
+    "git_diff_deleted_lines": 28,
+    "ai_additions": 710,
+    "ai_accepted": 710,
+    "BYMC": 19,
+    "mixed_additions": 0,
+    "BYAC": 710,
+    "BYRC": 0,
+    "per_file": {
+      "cmd/tui/main.go": {
+        "BYMC": [],
+        "BYAC": [
+          "1-24"
+        ],
+        "BYRC": []
+      },
+      "go.mod": {
+        "BYMC": [
+          "8-10",
+          "22",
+          "30-33",
+          "35-38",
+          "54",
+          "57-61",
+          "73"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/tui/app.go": {
+        "BYMC": [],
+        "BYAC": [
+          "1-272"
+        ],
+        "BYRC": []
+      },
+      "internal/tui/register.go": {
+        "BYMC": [],
+        "BYAC": [
+          "1-407"
+        ],
+        "BYRC": []
+      },
+      "internal/tui/styles.go": {
+        "BYMC": [],
+        "BYAC": [
+          "3-7",
+          "162",
+          "166"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787578057,
+  "requirement_id": ""
+}
