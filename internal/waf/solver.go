@@ -25,12 +25,16 @@ import (
 
 // BrowserSession 是一个可复用的浏览器会话，支持在同一 session 内执行多个 POST。
 type BrowserSession struct {
-	taskCtx   context.Context
-	cancel    context.CancelFunc
-	mu        sync.Mutex
-	seq       int64
-	curHandle string // 页面自身 XHR 请求中最新使用的 workflowStateHandle
-	ua        string // UA 覆盖值：与 tls-client 一致，保证跨客户端会话上下文对齐
+	taskCtx     context.Context
+	cancel      context.CancelFunc
+	mu          sync.Mutex
+	seq         int64
+	curHandle   string    // 页面自身 XHR 请求中最新使用的 workflowStateHandle
+	ua          string    // UA 覆盖值：与 tls-client 一致，保证跨客户端会话上下文对齐
+	closeOnce   sync.Once // 确保 cancel 只执行一次，避免 chromedp 内部 channel 重复关闭
+	taskCancel  context.CancelFunc
+	ctxCancel   context.CancelFunc
+	allocCancel context.CancelFunc
 }
 
 // xhrHandleHook 注入页面，拦截页面自身 XHR 响应并记录最新 workflowStateHandle
@@ -79,32 +83,32 @@ func NewBrowserSession(parent context.Context, proxy, loginURL, ua string, visib
 
 	taskCtx, taskCancel := chromedp.NewContext(allocCtx)
 
+	// 创建 session 对象，封装清理函数
+	s := &BrowserSession{
+		taskCtx:     taskCtx,
+		taskCancel:  taskCancel,
+		ctxCancel:   cancel,
+		allocCancel: allocCancel,
+		ua:          ua,
+	}
+
 	// 代理鉴权。
 	pi, _ := parseProxy(proxy)
 	if pi.hasAuth {
 		enableAuth, teardown := setupProxyAuth(taskCtx, pi)
 		defer teardown()
 		if err := chromedp.Run(taskCtx); err != nil {
-			taskCancel()
-			cancel()
-			allocCancel()
+			s.Close()
 			return nil, fmt.Errorf("浏览器启动失败: %w", err)
 		}
 		if enableAuth != nil {
 			if err := chromedp.Run(taskCtx, enableAuth); err != nil {
-				taskCancel()
-				cancel()
-				allocCancel()
+				s.Close()
 				return nil, fmt.Errorf("代理鉴权拦截安装失败: %w", err)
 			}
 		}
 	}
 
-	s := &BrowserSession{taskCtx: taskCtx, cancel: func() {
-		taskCancel()
-		cancel()
-		allocCancel()
-	}, ua: ua}
 	installNetworkLogging(taskCtx, s)
 
 	// 导航到登录页建立 session cookie。
@@ -127,9 +131,7 @@ func NewBrowserSession(parent context.Context, proxy, loginURL, ua string, visib
 		chromedp.Sleep(3*time.Second),
 	)
 	if err != nil {
-		taskCancel()
-		cancel()
-		allocCancel()
+		s.Close()
 		return nil, fmt.Errorf("登录页导航失败: %w", err)
 	}
 
@@ -283,7 +285,17 @@ func (s *BrowserSession) SetCookies(pairs map[string]string, forURL string) erro
 
 // Close 关闭浏览器。
 func (s *BrowserSession) Close() {
-	s.cancel()
+	s.closeOnce.Do(func() {
+		if s.taskCancel != nil {
+			s.taskCancel()
+		}
+		if s.ctxCancel != nil {
+			s.ctxCancel()
+		}
+		if s.allocCancel != nil {
+			s.allocCancel()
+		}
+	})
 }
 
 // browserFetch 在浏览器内用 fetch 执行一次 POST，返回 status + body。

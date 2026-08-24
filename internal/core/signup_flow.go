@@ -39,28 +39,8 @@ func (r *Registrar) Step6SubmitEmail() (string, error) {
 		return "login", nil
 	}
 
-	// 非预期状态码：先打印诊断信息。
+	// 非预期状态码：打印诊断信息并返回错误
 	logUnexpectedResponse("Step6SubmitEmail", status, respH, body)
-
-	// 检测 AWS WAF Challenge → 在浏览器内执行真实 Step6 绕过 TLS 指纹检测。
-	if isWAFChallenge(respH) {
-		log.Printf("[WAF] Step6 被 WAF 拦截（TLS 指纹），启动浏览器执行...")
-		browserErr := r.executeStep6InBrowser(api)
-		if browserErr != nil {
-			return "", browserErr
-		}
-		// 浏览器内 Step6 已成功，根据 r.WorkflowHandle 变化判断流向。
-		// 浏览器返回 400 = signup, 200 = login（与 tls-client 语义一致）。
-		if r.BrowserStep6Status == 400 {
-			log.Printf("[WAF] 浏览器 Step6 成功（400 → signup）")
-			return "signup", nil
-		} else if r.BrowserStep6Status == 200 {
-			log.Printf("[WAF] 浏览器 Step6 成功（200 → login）")
-			return "login", nil
-		}
-		return "", fmt.Errorf("提交邮箱失败: 浏览器执行 Step6 返回 %d", r.BrowserStep6Status)
-	}
-
 	return "", fmt.Errorf("提交邮箱失败: %d - %s", status, string(body)[:min(200, len(body))])
 }
 
@@ -586,6 +566,10 @@ func (r *Registrar) Step9SendOTP() error {
 			log.Printf("发送前邮件数: %d", count)
 		}
 	}
+	if r.Cfg.UseHttpAPI && r.Cfg.HttpAPIAccount != nil {
+		r.HttpAPISeenCodes = email.SnapshotHttpAPICodes(*r.Cfg.HttpAPIAccount)
+		log.Printf("发送前已见验证码数: %d", len(r.HttpAPISeenCodes))
+	}
 
 	ref := fmt.Sprintf("%s/?workflowID=%s", r.Cfg.ProfileBase, r.WorkflowID)
 	timeOnPage := 5000 + rand.Intn(3001)
@@ -618,26 +602,9 @@ func (r *Registrar) Step9SendOTP() error {
 		if r.Cfg.Debug {
 			log.Printf("[DEBUG] send-otp 失败: status=%d, body=%s, fp_len=%d", status, string(respBody), len(fp))
 		}
-		// TES 行为指纹风控（400 BLOCKED）或 WAF challenge（202）→ 回退浏览器执行。
-		// 根因：profile.aws.amazon.com 的 TES 拦截 tls-client（TLS/行为指纹非真人浏览器），
-		// 换 IP/节点无效（TES 不查 IP）；真实 Chrome 在浏览器内 fetch 则直接放行。
-		bodyStr := string(respBody)
-		isTESBlock := status == 400 && strings.Contains(bodyStr, "BLOCKED")
-		isWaf := isWAFChallenge(respH)
-		if isTESBlock || isWaf {
-			log.Printf("[WAF] send-otp 被%s拦截，改用浏览器执行...", map[bool]string{true: " TES", false: " WAF"}[isTESBlock])
-			bStatus, bBody, bErr := r.sendOTPInBrowser(reqPayload)
-			if bErr != nil {
-				log.Printf("[WAF] 浏览器 send-otp 执行失败: %v", bErr)
-			} else if bStatus == 200 {
-				log.Println("验证码已发送（浏览器）")
-				return nil
-			} else {
-				log.Printf("[WAF] 浏览器 send-otp 结果: status=%d, body=%s", bStatus, truncateStr(bBody, 200))
-				return fmt.Errorf("send-otp 失败 (%d): %s", bStatus, truncateStr(bBody, 200))
-			}
-		}
+
 		// 把响应体里的风控标记（如 BLOCKED/TES）带进 error，供上游 formatError / isKillSwitchError 精准识别
+		bodyStr := string(respBody)
 		if len(bodyStr) > 200 {
 			bodyStr = bodyStr[:200]
 		}
@@ -730,11 +697,19 @@ func truncateStr(s string, n int) string {
 	return s[:n]
 }
 
-// Step10GetOTP 等待验证码 (临时邮箱或 Outlook IMAP)
+// Step10GetOTP 等待验证码 (临时邮箱 / Outlook IMAP / HTTP API)
 func (r *Registrar) Step10GetOTP() (string, error) {
 	log.Println("[10] 等待验证码")
 	if r.Cfg.UseOutlook && r.Cfg.OutlookAccount != nil {
 		code, err := email.WaitForOTP(*r.Cfg.OutlookAccount, r.OutlookMailCount, 120, 5)
+		if err != nil {
+			return "", err
+		}
+		log.Printf("验证码: %s", code)
+		return code, nil
+	}
+	if r.Cfg.UseHttpAPI && r.Cfg.HttpAPIAccount != nil {
+		code, err := email.WaitForHttpAPICode(*r.Cfg.HttpAPIAccount, r.HttpAPISeenCodes, 120, 3)
 		if err != nil {
 			return "", err
 		}
