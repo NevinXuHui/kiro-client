@@ -1,0 +1,28 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "58d2353c9912aa563686e15594aa020b8165eed1",
+  "prompts": {},
+  "commit_stats": {
+    "git_diff_added_lines": 247,
+    "git_diff_deleted_lines": 0,
+    "ai_additions": 0,
+    "ai_accepted": 0,
+    "BYMC": 247,
+    "mixed_additions": 0,
+    "BYAC": 0,
+    "BYRC": 0,
+    "per_file": {
+      "TUI_VERSION_SUMMARY.md": {
+        "BYMC": [
+          "1-247"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787578133,
+  "requirement_id": ""
+}
