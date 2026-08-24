@@ -1,0 +1,92 @@
+internal/email/cloudmail_test.go
+  1d6eb96a5176dd88 1-134
+internal/email/outlook_imap_test.go
+  ef2d8723cc314534 1-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "f5aa8d4dc24d75cd3c6bf0aa2deba1b9eedadf82",
+  "prompts": {
+    "1d6eb96a5176dd88": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "36581df8-5a95-4cda-a10a-5f530128a5ab",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 252,
+      "overriden_lines": 0
+    },
+    "49e835e3e576d80a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb88561d-22b7-4446-ba13-f386ea62a9cd",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 92,
+      "overriden_lines": 0
+    },
+    "ae615b658894cdd8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28439f9d-9fea-48b7-ba7f-12496b79567b",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 41,
+      "overriden_lines": 0
+    },
+    "ef2d8723cc314534": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9e4058ee-4839-4bf7-9378-326803801b7f",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 459,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 206,
+    "git_diff_deleted_lines": 0,
+    "ai_additions": 206,
+    "ai_accepted": 206,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 206,
+    "BYRC": 0,
+    "per_file": {
+      "internal/email/cloudmail_test.go": {
+        "BYMC": [],
+        "BYAC": [
+          "1-134"
+        ],
+        "BYRC": []
+      },
+      "internal/email/outlook_imap_test.go": {
+        "BYMC": [],
+        "BYAC": [
+          "1-72"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787572584,
+  "requirement_id": ""
+}
