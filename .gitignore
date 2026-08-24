@@ -16,3 +16,23 @@ node_modules/
 .DS_Store
 Thumbs.db
 *.log
+
+# IDE
+.vscode/
+
+# Build artifacts
+build/
+kiro-client
+*.exe
+
+# Data files
+accounts.json
+kiro-accounts-*.json
+
+# Scripts
+run.sh
+
+# Tray (platform-specific, generated)
+tray_darwin.go
+tray_darwin.m
+tray_other.go
