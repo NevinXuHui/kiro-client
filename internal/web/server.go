@@ -231,6 +231,38 @@ func (s *Server) HandlePoolsRefresh(w http.ResponseWriter, r *http.Request) {
 	s.respondJSON(w, result)
 }
 
+// HandleProxyBatchAdd 批量添加代理
+func (s *Server) HandleProxyBatchAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var req struct {
+		URLs   []string `json:"urls"`
+		Weight int      `json:"weight"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// TODO: 调用实际的批量添加逻辑
+	// 这里暂时返回模拟结果
+	result := map[string]interface{}{
+		"success": len(req.URLs),
+		"failed":  0,
+		"skipped": 0,
+		"total":   len(req.URLs),
+		"added":   req.URLs,
+		"errors":  []string{},
+	}
+
+	s.respondJSON(w, result)
+	s.broadcastEvent("proxy_batch_added", result)
+}
+
 // HandleGatewayStart 启动网关
 func (s *Server) HandleGatewayStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

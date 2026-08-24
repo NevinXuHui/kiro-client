@@ -84,6 +84,82 @@ function addEmptyProxyRow() {
   }, 0);
 }
 
+async function showBatchAddProxyModal() {
+  var content = '<div>' +
+    '<p style="margin-bottom:12px;color:var(--text-muted);font-size:13px;">每行一个代理地址，支持以下格式：</p>' +
+    '<ul style="margin:0 0 12px 20px;padding:0;list-style:disc;color:var(--text-muted);font-size:12px;">' +
+    '<li>http://host:port</li>' +
+    '<li>http://user:pass@host:port</li>' +
+    '<li>socks5://host:port</li>' +
+    '<li>socks5://user:pass@host:port</li>' +
+    '<li>空行和 # 开头的注释行会被跳过</li>' +
+    '</ul>' +
+    '<textarea id="batch-proxy-input" rows="10" placeholder="http://proxy1.example.com:8080\nhttp://user:pass@proxy2.example.com:8080\nsocks5://proxy3.example.com:1080\n# 这是注释" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-subtle);font-family:var(--font-mono);font-size:12px;resize:vertical;"></textarea>' +
+    '<div style="margin-top:12px;display:flex;align-items:center;gap:8px;">' +
+    '<label style="font-size:13px;color:var(--text-2);">默认权重:</label>' +
+    '<input type="number" id="batch-proxy-weight" min="1" max="100" value="50" style="width:80px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-subtle);text-align:center;">' +
+    '<span style="font-size:12px;color:var(--text-muted);">（1-100，推荐 50）</span>' +
+    '</div>' +
+    '</div>';
+
+  showConfirmModal('批量添加代理', content, '添加', async function() {
+    var textarea = document.getElementById('batch-proxy-input');
+    var weightInput = document.getElementById('batch-proxy-weight');
+    if (!textarea) return;
+
+    var text = textarea.value.trim();
+    if (!text) {
+      showToast('请输入代理地址', 'error');
+      return;
+    }
+
+    var weight = parseInt(weightInput.value, 10) || 50;
+    if (weight < 1) weight = 1;
+    if (weight > 100) weight = 100;
+
+    // 按行分割
+    var lines = text.split('\n');
+    var urls = [];
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (line && !line.startsWith('#') && !line.startsWith('//')) {
+        urls.push(line);
+      }
+    }
+
+    if (urls.length === 0) {
+      showToast('没有有效的代理地址', 'error');
+      return;
+    }
+
+    showToast('正在添加 ' + urls.length + ' 个代理...');
+
+    try {
+      var result = await window.go.main.App.BatchAddProxyEntries(urls, weight);
+      if (result.error) {
+        showToast(result.error, 'error');
+        return;
+      }
+
+      // 显示结果
+      var msg = '批量添加完成！\n';
+      msg += '成功: ' + (result.success || 0) + ' 个\n';
+      if (result.skipped > 0) msg += '跳过（重复）: ' + result.skipped + ' 个\n';
+      if (result.failed > 0) msg += '失败: ' + result.failed + ' 个\n';
+      if (result.errors && result.errors.length > 0) {
+        msg += '\n错误信息:\n' + result.errors.join('\n');
+      }
+
+      showToast(msg.replace(/\n/g, '<br>'), result.success > 0 ? 'success' : 'error');
+
+      // 刷新列表
+      await loadProxyPool();
+    } catch (e) {
+      showToast('批量添加失败: ' + e.message, 'error');
+    }
+  });
+}
+
 function removePendingProxyRow(idx) {
   pendingEmptyRows = Math.max(0, pendingEmptyRows - 1);
   // 至少保留一个空行（如果完全没有已保存代理）

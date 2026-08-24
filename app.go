@@ -537,6 +537,14 @@ func (a *App) AddProxyEntry(name, url string, weight int) map[string]interface{}
 	return m
 }
 
+func (a *App) BatchAddProxyEntries(urls []string, weight int) map[string]interface{} {
+	result := proxy.BatchAdd(urls, weight)
+	b, _ := json.Marshal(result)
+	var m map[string]interface{}
+	json.Unmarshal(b, &m)
+	return m
+}
+
 func (a *App) UpdateProxyEntry(id, name, url string, weight int, enabled bool) map[string]interface{} {
 	e, err := proxy.Update(id, proxy.PoolEntry{Name: name, URL: url, Weight: weight, Enabled: enabled})
 	if err != nil {

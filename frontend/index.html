@@ -831,9 +831,14 @@
                     <div class="frm-hint" data-i18n="settings.proxyPoolDesc">供注册机（Outlook 注册任务）使用的代理列表，按权重轮询选取。</div>
                   </div>
                   <div id="proxy-pool-list"></div>
-                  <button class="btn btn-outline btn-sm" onclick="addEmptyProxyRow()" style="margin-top:8px;">
-                    <i data-lucide="plus"></i><span>添加代理</span>
-                  </button>
+                  <div style="display:flex;gap:8px;margin-top:8px;">
+                    <button class="btn btn-outline btn-sm" onclick="addEmptyProxyRow()">
+                      <i data-lucide="plus"></i><span>添加代理</span>
+                    </button>
+                    <button class="btn btn-outline btn-sm" onclick="showBatchAddProxyModal()">
+                      <i data-lucide="copy-plus"></i><span>批量添加</span>
+                    </button>
+                  </div>
                 </div>
               </div>
               <!-- 域名池（注册机用） -->

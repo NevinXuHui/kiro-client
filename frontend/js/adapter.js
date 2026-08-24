@@ -202,7 +202,20 @@ window.go = {
         return { success: true };
       },
 
-      // HTTP API 账号相关
+      // BatchAddProxyEntry 批量添加代理到 Wails adapter
+BatchAddProxyEntries: async function(urls, weight) {
+  try {
+    const response = await fetch(`${this.baseURL}/api/proxy/batch-add`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ urls, weight })
+    });
+    return await response.json();
+  } catch (err) {
+    console.error('BatchAddProxyEntries error:', err);
+    throw err;
+  }
+},
       GetHttpAPIAccounts: async function() {
         const accounts = localStorage.getItem('kiro_httpapi_accounts');
         return accounts ? JSON.parse(accounts) : [];

@@ -36,6 +36,7 @@ func main() {
 	mux.HandleFunc("/api/pools/list", server.HandlePoolsList)
 	mux.HandleFunc("/api/pools/export", server.HandlePoolsExport)
 	mux.HandleFunc("/api/pools/refresh", server.HandlePoolsRefresh)
+	mux.HandleFunc("/api/proxy/batch-add", server.HandleProxyBatchAdd)
 	mux.HandleFunc("/api/gateway/start", server.HandleGatewayStart)
 	mux.HandleFunc("/api/gateway/stop", server.HandleGatewayStop)
 	mux.HandleFunc("/api/gateway/status", server.HandleGatewayStatus)

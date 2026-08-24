@@ -134,6 +134,95 @@ func Add(entry PoolEntry) (PoolEntry, error) {
 	return entry, nil
 }
 
+// BatchAddResult 批量添加结果
+type BatchAddResult struct {
+	Success   int      `json:"success"`   // 成功添加数量
+	Failed    int      `json:"failed"`    // 失败数量
+	Skipped   int      `json:"skipped"`   // 跳过数量（重复）
+	Total     int      `json:"total"`     // 总数量
+	Errors    []string `json:"errors"`    // 错误信息列表
+	Added     []string `json:"added"`     // 成功添加的代理地址
+}
+
+// BatchAdd 批量新增代理
+func BatchAdd(urls []string, defaultWeight int) BatchAddResult {
+	result := BatchAddResult{
+		Total:  len(urls),
+		Errors: []string{},
+		Added:  []string{},
+	}
+
+	if defaultWeight <= 0 {
+		defaultWeight = 50
+	}
+	if defaultWeight > 100 {
+		defaultWeight = 100
+	}
+
+	poolMu.Lock()
+	defer poolMu.Unlock()
+	loadPoolLocked()
+
+	// 构建已存在的 URL 集合
+	existingURLs := make(map[string]bool)
+	for _, e := range poolEntries {
+		existingURLs[e.URL] = true
+	}
+
+	// 处理每个 URL
+	for _, url := range urls {
+		url = strings.TrimSpace(url)
+
+		// 跳过空行
+		if url == "" {
+			continue
+		}
+
+		// 跳过注释行
+		if strings.HasPrefix(url, "#") || strings.HasPrefix(url, "//") {
+			continue
+		}
+
+		// 检查是否已存在
+		if existingURLs[url] {
+			result.Skipped++
+			continue
+		}
+
+		// 创建条目
+		entry := PoolEntry{
+			ID:      newID(),
+			Name:    url,
+			URL:     url,
+			Weight:  defaultWeight,
+			Enabled: true,
+		}
+
+		// 添加到池中
+		poolEntries = append(poolEntries, entry)
+		existingURLs[url] = true // 防止批量中的重复
+		result.Success++
+		result.Added = append(result.Added, url)
+	}
+
+	// 计算失败数
+	result.Failed = result.Total - result.Success - result.Skipped
+
+	// 保存
+	if result.Success > 0 {
+		if err := savePoolLocked(); err != nil {
+			// 保存失败，回滚
+			poolEntries = poolEntries[:len(poolEntries)-result.Success]
+			result.Errors = append(result.Errors, fmt.Sprintf("保存失败: %v", err))
+			result.Failed = result.Success
+			result.Success = 0
+			result.Added = []string{}
+		}
+	}
+
+	return result
+}
+
 // Update 修改一条（按 id 匹配）。url 不允许改成已存在的另一条。
 func Update(id string, patch PoolEntry) (PoolEntry, error) {
 	poolMu.Lock()
