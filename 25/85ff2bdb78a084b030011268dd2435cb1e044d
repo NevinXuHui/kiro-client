@@ -1,0 +1,49 @@
+internal/tui/register.go
+  e6c611d58b9d586b 128-150,196,206-214,220,223,228
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "2585ff2bdb78a084b030011268dd2435cb1e044d",
+  "prompts": {
+    "e6c611d58b9d586b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4bb9589b-8b9f-4e64-8afe-67364947b4ea",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 36,
+      "total_deletions": 12,
+      "accepted_lines": 36,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 36,
+    "git_diff_deleted_lines": 12,
+    "ai_additions": 36,
+    "ai_accepted": 36,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 36,
+    "BYRC": 0,
+    "per_file": {
+      "internal/tui/register.go": {
+        "BYMC": [],
+        "BYAC": [
+          "128-150",
+          "196",
+          "206-214",
+          "220",
+          "223",
+          "228"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787578521,
+  "requirement_id": ""
+}
