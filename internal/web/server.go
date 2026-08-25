@@ -5,11 +5,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 
 	"github.com/gorilla/websocket"
 
+	"reg_go/internal/email"
+	"reg_go/internal/proxy"
 	"reg_go/internal/reverseproxy"
+	"reg_go/internal/storage"
 	"reg_go/internal/task"
 )
 
@@ -40,10 +44,24 @@ func NewServer() *Server {
 		},
 	}
 
+	dataDir := storage.GetDataDir()
+	proxy.InitPool(dataDir)
+	email.InitDomainPool(dataDir)
+
+	log.SetOutput(&logWriter{})
+	log.SetFlags(log.Ltime)
+
 	// 启动广播协程
 	go s.broadcastLoop()
 
 	return s
+}
+
+type logWriter struct{}
+
+func (w *logWriter) Write(p []byte) (int, error) {
+	task.Manager.AppendLog(string(p))
+	return os.Stderr.Write(p)
 }
 
 // broadcastLoop 广播循环
@@ -157,15 +175,16 @@ func (s *Server) HandleRegisterStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 简单状态响应
-	status := map[string]interface{}{
-		"running":   false,
-		"completed": 0,
-		"failed":    0,
-		"total":     0,
-	}
+	s.respondJSON(w, task.Manager.GetStatus())
+}
 
-	s.respondJSON(w, status)
+// HandleLogs 获取任务日志
+func (s *Server) HandleLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.respondJSON(w, task.Manager.GetLogs())
 }
 
 // HandlePoolsList 获取号池列表
@@ -231,6 +250,15 @@ func (s *Server) HandlePoolsRefresh(w http.ResponseWriter, r *http.Request) {
 	s.respondJSON(w, result)
 }
 
+// HandleProxyList 列出代理池
+func (s *Server) HandleProxyList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.respondJSON(w, proxy.List())
+}
+
 // HandleProxyBatchAdd 批量添加代理
 func (s *Server) HandleProxyBatchAdd(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -248,19 +276,211 @@ func (s *Server) HandleProxyBatchAdd(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: 调用实际的批量添加逻辑
-	// 这里暂时返回模拟结果
-	result := map[string]interface{}{
-		"success": len(req.URLs),
-		"failed":  0,
-		"skipped": 0,
-		"total":   len(req.URLs),
-		"added":   req.URLs,
-		"errors":  []string{},
-	}
-
+	result := proxy.BatchAdd(req.URLs, req.Weight)
 	s.respondJSON(w, result)
 	s.broadcastEvent("proxy_batch_added", result)
+}
+
+// HandleProxyTest 测试单条代理连通性
+func (s *Server) HandleProxyTest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	s.respondJSON(w, proxy.Detect(req.URL))
+}
+
+// HandleProxyAdd 新增一条代理
+func (s *Server) HandleProxyAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Name   string `json:"name"`
+		URL    string `json:"url"`
+		Weight int    `json:"weight"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	e, err := proxy.Add(proxy.PoolEntry{Name: req.Name, URL: req.URL, Weight: req.Weight, Enabled: true})
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, e)
+}
+
+// HandleProxyUpdate 更新一条代理
+func (s *Server) HandleProxyUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		URL     string `json:"url"`
+		Weight  int    `json:"weight"`
+		Enabled bool   `json:"enabled"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	e, err := proxy.Update(req.ID, proxy.PoolEntry{Name: req.Name, URL: req.URL, Weight: req.Weight, Enabled: req.Enabled})
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, e)
+}
+
+// HandleProxyDelete 删除一条代理
+func (s *Server) HandleProxyDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	if err := proxy.Delete(req.ID); err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, map[string]interface{}{"success": true})
+}
+
+// HandleOutlookList 列出 Outlook 账号
+func (s *Server) HandleOutlookList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.respondJSON(w, email.GetOutlookAccounts())
+}
+
+// HandleOutlookAdd 添加 Outlook 账号（卡密文本）
+func (s *Server) HandleOutlookAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Data string `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	s.respondJSON(w, email.AddOutlookAccounts(req.Data))
+}
+
+// HandleOutlookDelete 删除单个 Outlook 账号
+func (s *Server) HandleOutlookDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	s.respondJSON(w, email.DeleteOutlookAccount(req.Email))
+}
+
+// HandleOutlookClear 清空 Outlook 账号
+func (s *Server) HandleOutlookClear(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.respondJSON(w, email.ClearOutlookAccounts())
+}
+
+// HandleOutlookClearRegistered 清除已注册 Outlook 账号
+func (s *Server) HandleOutlookClearRegistered(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.respondJSON(w, email.ClearRegisteredOutlookAccounts())
+}
+
+// HandleHttpAPIList 列出 HTTP 邮箱
+func (s *Server) HandleHttpAPIList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.respondJSON(w, email.GetHttpAPIAccounts())
+}
+
+// HandleHttpAPIAdd 添加 HTTP 邮箱（卡密文本）
+func (s *Server) HandleHttpAPIAdd(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Data string `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	s.respondJSON(w, email.AddHttpAPIAccounts(req.Data))
+}
+
+// HandleHttpAPIDelete 删除单个 HTTP 邮箱
+func (s *Server) HandleHttpAPIDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Email string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	s.respondJSON(w, email.DeleteHttpAPIAccount(req.Email))
+}
+
+// HandleHttpAPIClear 清空 HTTP 邮箱
+func (s *Server) HandleHttpAPIClear(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.respondJSON(w, email.ClearHttpAPIAccounts())
+}
+
+// HandleHttpAPIClearRegistered 清除已注册 HTTP 邮箱
+func (s *Server) HandleHttpAPIClearRegistered(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.respondJSON(w, email.ClearRegisteredHttpAPIAccounts())
 }
 
 // HandleGatewayStart 启动网关
@@ -354,6 +574,43 @@ func (s *Server) HandleGatewayStatus(w http.ResponseWriter, r *http.Request) {
 	s.respondJSON(w, result)
 }
 
+// HandleProxyBatchDelete 批量删除代理
+func (s *Server) HandleProxyBatchDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		IDs []string `json:"ids"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	result := proxy.DeleteMany(req.IDs)
+	s.respondJSON(w, result)
+	s.broadcastEvent("proxy_batch_deleted", result)
+}
+
+// HandleProxyBatchWeight 批量设置权重
+func (s *Server) HandleProxyBatchWeight(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		IDs    []string `json:"ids"`
+		Weight int      `json:"weight"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	result := proxy.SetWeightMany(req.IDs, req.Weight)
+	s.respondJSON(w, result)
+	s.broadcastEvent("proxy_batch_weight", result)
+}
+
 // respondJSON 返回 JSON 响应
 func (s *Server) respondJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
@@ -380,4 +637,3 @@ func (s *Server) broadcastEvent(eventType string, data interface{}) {
 		s.Broadcast(jsonData)
 	}
 }
-

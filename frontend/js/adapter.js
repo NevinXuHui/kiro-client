@@ -34,10 +34,30 @@ window.go = {
 
       GetTaskStatus: async function() {
         try {
-          return await window.kiroAPI.getRegisterStatus();
+          const status = await window.kiroAPI.getRegisterStatus();
+          return { kiro: status };
         } catch (err) {
           console.error('GetTaskStatus error:', err);
-          return { running: false, completed: 0, failed: 0, total: 0 };
+          return { kiro: { running: false, completed: 0, failed: 0, total: 0 } };
+        }
+      },
+
+      GetStatus: async function() {
+        try {
+          return await window.kiroAPI.getRegisterStatus();
+        } catch (err) {
+          console.error('GetStatus error:', err);
+          return { running: false, completed: 0, failed: 0, total: 0, success: 0, elapsed: 0 };
+        }
+      },
+
+      GetLogs: async function() {
+        try {
+          const logs = await window.kiroAPI.getLogs();
+          return Array.isArray(logs) ? logs : [];
+        } catch (err) {
+          console.error('GetLogs error:', err);
+          return [];
         }
       },
 
@@ -197,132 +217,65 @@ window.go = {
         return { success: false, message: 'Not supported in web version' };
       },
 
-      // Outlook 账号相关
+      // Outlook 账号：走服务端存储（与注册任务同一数据源）
       GetOutlookAccounts: async function() {
-        // 从 localStorage 读取
-        const accounts = localStorage.getItem('kiro_outlook_accounts');
-        return accounts ? JSON.parse(accounts) : [];
+        var list = [];
+        try {
+          list = await window.kiroAPI.listOutlook() || [];
+        } catch (err) {
+          console.error('GetOutlookAccounts error:', err);
+          list = [];
+        }
+        if (!Array.isArray(list)) list = [];
+
+        // 一次性把浏览器里旧的 localStorage 账号迁到服务端
+        var raw = localStorage.getItem('kiro_outlook_accounts');
+        if (list.length === 0 && raw) {
+          try {
+            var local = JSON.parse(raw);
+            if (Array.isArray(local) && local.length) {
+              var lines = [];
+              for (var i = 0; i < local.length; i++) {
+                var a = local[i] || {};
+                if (!a.email || !a.password || !a.clientId || !a.refreshToken) continue;
+                lines.push([a.email, a.password, a.clientId, a.refreshToken].join('----'));
+              }
+              if (lines.length) {
+                await window.kiroAPI.addOutlook(lines.join('\n'));
+                list = await window.kiroAPI.listOutlook() || [];
+                if (!Array.isArray(list)) list = [];
+              }
+            }
+          } catch (e) {
+            console.error('migrate outlook localStorage failed:', e);
+          }
+        }
+        if (raw) localStorage.removeItem('kiro_outlook_accounts');
+        return list;
       },
 
       AddOutlookAccount: async function(email, password) {
-        const accounts = await this.GetOutlookAccounts();
-        accounts.push({ email, password, added: new Date().toISOString() });
-        localStorage.setItem('kiro_outlook_accounts', JSON.stringify(accounts));
-        return { success: true };
+        return window.kiroAPI.addOutlook(email + '----' + password + '---- ----');
       },
 
       AddOutlookAccounts: async function(data) {
-        try {
-          // 解析账号数据
-          const lines = data.trim().split('\n');
-          let addedCount = 0;
-          const accounts = await this.GetOutlookAccounts();
-
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine || trimmedLine.startsWith('#') || trimmedLine.startsWith('//')) {
-              continue;
-            }
-
-            // 解析格式：邮箱----密码----ClientID----RefreshToken
-            const parts = trimmedLine.split('----');
-            if (parts.length < 4) {
-              console.warn('跳过格式错误的行:', trimmedLine.substring(0, 50));
-              continue;
-            }
-
-            const email = parts[0].trim();
-            const password = parts[1].trim();
-            const field3 = parts[2].trim();
-            const field4 = parts[3].trim();
-
-            // 自动识别 ClientID 和 RefreshToken
-            let clientId, refreshToken;
-            if (field3.startsWith('aorAAAAAG')) {
-              refreshToken = field3;
-              clientId = field4;
-            } else if (field4.startsWith('aorAAAAAG')) {
-              clientId = field3;
-              refreshToken = field4;
-            } else if (field3.includes('nVzLWVhc3QtMQ')) {
-              clientId = field3;
-              refreshToken = field4;
-            } else if (field4.includes('nVzLWVhc3QtMQ')) {
-              clientId = field4;
-              refreshToken = field3;
-            } else {
-              clientId = field3;
-              refreshToken = field4;
-            }
-
-            // 检查是否已存在
-            const exists = accounts.some(acc => acc.email === email);
-            if (exists) {
-              console.log('账号已存在，跳过:', email);
-              continue;
-            }
-
-            // 添加账号
-            accounts.push({
-              email,
-              password,
-              clientId,
-              refreshToken,
-              registered: false,
-              success: false,
-              addedAt: new Date().toISOString()
-            });
-            addedCount++;
-          }
-
-          if (addedCount === 0) {
-            return { error: '未解析到有效账号或所有账号已存在' };
-          }
-
-          // 保存到 localStorage
-          localStorage.setItem('kiro_outlook_accounts', JSON.stringify(accounts));
-
-          return {
-            added: addedCount,
-            total: accounts.length
-          };
-        } catch (err) {
-          console.error('AddOutlookAccounts error:', err);
-          return { error: err.message };
-        }
+        return window.kiroAPI.addOutlook(data);
       },
 
       DeleteOutlookAccount: async function(email) {
-        let accounts = await this.GetOutlookAccounts();
-        const originalLength = accounts.length;
-        accounts = accounts.filter(acc => acc.email !== email);
-        localStorage.setItem('kiro_outlook_accounts', JSON.stringify(accounts));
-        return {
-          status: 'deleted',
-          total: accounts.length,
-          success: accounts.length < originalLength
-        };
+        return window.kiroAPI.deleteOutlook(email);
       },
 
       RemoveOutlookAccount: async function(email) {
-        return await this.DeleteOutlookAccount(email);
+        return window.kiroAPI.deleteOutlook(email);
       },
 
       ClearOutlookAccounts: async function() {
-        localStorage.setItem('kiro_outlook_accounts', JSON.stringify([]));
-        return { status: 'cleared' };
+        return window.kiroAPI.clearOutlook();
       },
 
       ClearRegisteredOutlookAccounts: async function() {
-        let accounts = await this.GetOutlookAccounts();
-        const originalCount = accounts.length;
-        accounts = accounts.filter(acc => !acc.registered);
-        localStorage.setItem('kiro_outlook_accounts', JSON.stringify(accounts));
-        return {
-          status: 'ok',
-          removed: originalCount - accounts.length,
-          total: accounts.length
-        };
+        return window.kiroAPI.clearRegisteredOutlook();
       },
 
       SelectOutlookFile: async function() {
@@ -335,37 +288,114 @@ window.go = {
         return { error: 'Web 版本暂不支持文件导入，请直接粘贴账号数据' };
       },
 
-      // BatchAddProxyEntry 批量添加代理到 Wails adapter
-BatchAddProxyEntries: async function(urls, weight) {
-  try {
-    const response = await fetch(`${this.baseURL}/api/proxy/batch-add`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ urls, weight })
-    });
-    return await response.json();
-  } catch (err) {
-    console.error('BatchAddProxyEntries error:', err);
-    throw err;
-  }
-},
+      ListProxyPool: async function() {
+        try {
+          return await window.kiroAPI.listProxyPool();
+        } catch (err) {
+          console.error('ListProxyPool error:', err);
+          return [];
+        }
+      },
+
+      BatchAddProxyEntries: async function(urls, weight) {
+        try {
+          return await window.kiroAPI.batchAddProxy(urls, weight);
+        } catch (err) {
+          console.error('BatchAddProxyEntries error:', err);
+          throw err;
+        }
+      },
+
+      AddProxyEntry: async function(name, url, weight) {
+        return window.kiroAPI.addProxy(name, url, weight);
+      },
+
+      UpdateProxyEntry: async function(id, name, url, weight, enabled) {
+        return window.kiroAPI.updateProxy(id, name, url, weight, enabled);
+      },
+
+      DeleteProxyEntry: async function(id) {
+        return window.kiroAPI.deleteProxy(id);
+      },
+
+      BatchDeleteProxyEntries: async function(ids) {
+        return window.kiroAPI.batchDeleteProxy(ids);
+      },
+
+      BatchSetProxyWeight: async function(ids, weight) {
+        return window.kiroAPI.batchSetProxyWeight(ids, weight);
+      },
+
+      TestProxyEntry: async function(url) {
+        return window.kiroAPI.testProxy(url);
+      },
+
+      DetectProxy: async function(proxyStr) {
+        return window.kiroAPI.testProxy(proxyStr);
+      },
+
+      // HTTP 邮箱：走服务端存储（与注册任务同一数据源）
       GetHttpAPIAccounts: async function() {
-        const accounts = localStorage.getItem('kiro_httpapi_accounts');
-        return accounts ? JSON.parse(accounts) : [];
+        var list = [];
+        try {
+          list = await window.kiroAPI.listHttpAPI() || [];
+        } catch (err) {
+          console.error('GetHttpAPIAccounts error:', err);
+          list = [];
+        }
+        if (!Array.isArray(list)) list = [];
+
+        var raw = localStorage.getItem('kiro_httpapi_accounts');
+        if (list.length === 0 && raw) {
+          try {
+            var local = JSON.parse(raw);
+            if (Array.isArray(local) && local.length) {
+              var lines = [];
+              for (var i = 0; i < local.length; i++) {
+                var a = local[i] || {};
+                if (!a.email || !a.apiUrl) continue;
+                lines.push(a.email + '----' + a.apiUrl);
+              }
+              if (lines.length) {
+                await window.kiroAPI.addHttpAPI(lines.join('\n'));
+                list = await window.kiroAPI.listHttpAPI() || [];
+                if (!Array.isArray(list)) list = [];
+              }
+            }
+          } catch (e) {
+            console.error('migrate httpapi localStorage failed:', e);
+          }
+        }
+        if (raw) localStorage.removeItem('kiro_httpapi_accounts');
+        return list;
+      },
+
+      AddHttpAPIAccounts: async function(data) {
+        return window.kiroAPI.addHttpAPI(data);
       },
 
       AddHttpAPIAccount: async function(email, apiUrl) {
-        const accounts = await this.GetHttpAPIAccounts();
-        accounts.push({ email, apiUrl, added: new Date().toISOString() });
-        localStorage.setItem('kiro_httpapi_accounts', JSON.stringify(accounts));
-        return { success: true };
+        return window.kiroAPI.addHttpAPI(email + '----' + apiUrl);
+      },
+
+      DeleteHttpAPIAccount: async function(email) {
+        return window.kiroAPI.deleteHttpAPI(email);
       },
 
       RemoveHttpAPIAccount: async function(email) {
-        let accounts = await this.GetHttpAPIAccounts();
-        accounts = accounts.filter(acc => acc.email !== email);
-        localStorage.setItem('kiro_httpapi_accounts', JSON.stringify(accounts));
-        return { success: true };
+        return window.kiroAPI.deleteHttpAPI(email);
+      },
+
+      ClearHttpAPIAccounts: async function() {
+        return window.kiroAPI.clearHttpAPI();
+      },
+
+      ClearRegisteredHttpAPIAccounts: async function() {
+        return window.kiroAPI.clearRegisteredHttpAPI();
+      },
+
+      ImportHttpAPIFile: async function(path) {
+        return { error: 'Web 版本暂不支持文件导入，请直接粘贴账号数据' };
       }
     }
   }

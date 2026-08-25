@@ -571,6 +571,14 @@ func (a *App) TestProxyEntry(url string) map[string]interface{} {
 	return m
 }
 
+func (a *App) BatchDeleteProxyEntries(ids []string) map[string]interface{} {
+	return proxy.DeleteMany(ids)
+}
+
+func (a *App) BatchSetProxyWeight(ids []string, weight int) map[string]interface{} {
+	return proxy.SetWeightMany(ids, weight)
+}
+
 // ===== Subscription =====
 
 func (a *App) LoadOutputAccounts() map[string]interface{} {

@@ -283,7 +283,8 @@ function closeKiroTaskModal() {
 (function() {
   var modalCloseMap = {
     'outlook-modal': function() { if (typeof closeOutlookModal === 'function') closeOutlookModal(); },
-    'httpapi-modal': function() { if (typeof closeHttpAPIModal === 'function') closeHttpAPIModal(); }
+    'httpapi-modal': function() { if (typeof closeHttpAPIModal === 'function') closeHttpAPIModal(); },
+    'batch-proxy-modal': function() { if (typeof closeBatchAddProxyModal === 'function') closeBatchAddProxyModal(); }
   };
 
   var mouseDownTarget = null;
