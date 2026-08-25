@@ -123,6 +123,8 @@ func endpointLabel(url string) string {
 	}
 }
 
+const kiroRESTIDEVersion = "2.3.0"
+const builderIDProfileARN = "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX"
 
 func effectiveVerifyArn(arn string) string {
 	arn = strings.TrimSpace(arn)
@@ -132,12 +134,16 @@ func effectiveVerifyArn(arn string) string {
 	return arn
 }
 
-func qEndpointURL(path, query, profileArn string) string {
-	u := "https://q.us-east-1.amazonaws.com/" + path + "?" + query
-	if arn := effectiveVerifyArn(profileArn); arn != "" {
-		u += "&profileArn=" + url.QueryEscape(arn)
+func usageQueryProfileArn(arn string) string {
+	arn = strings.TrimSpace(arn)
+	if arn == "" {
+		return builderIDProfileARN
 	}
-	return u
+	return arn
+}
+
+func qEndpointURL(path, query, profileArn string) string {
+	return "https://q.us-east-1.amazonaws.com/" + path + "?" + query + "&profileArn=" + url.QueryEscape(usageQueryProfileArn(profileArn))
 }
 
 func resolveVerifyProfileArn(client interface {
@@ -183,14 +189,7 @@ func resolveVerifyProfileArn(client interface {
 func queryQEndpoint(client interface {
 	Do(req *fhttp.Request) (*fhttp.Response, error)
 }, access, path, query, profileArn string) endpointResult {
-	res := queryGetEndpointWithRetry(client, access, qEndpointURL(path, query, profileArn))
-	if res.ok {
-		return res
-	}
-	if profileArn != "" {
-		return queryGetEndpointWithRetry(client, access, qEndpointURL(path, query, ""))
-	}
-	return res
+	return queryGetEndpointWithRetry(client, access, qEndpointURL(path, query, profileArn))
 }
 
 // queryGetEndpointWithRetry 带重试的 GET 端点查询。
@@ -211,7 +210,8 @@ func queryGetEndpointWithRetry(client interface {
 		req, _ := fhttp.NewRequest("GET", url, nil)
 		req.Header.Set("Accept", "application/json")
 		req.Header.Set("Authorization", "Bearer "+access)
-		req.Header.Set("User-Agent", "aws-sdk-js/1.0.18 ua/2.1 os/windows lang/js md/nodejs#20.16.0 api/codewhispererstreaming#1.0.18 m/E KiroIDE-0.6.18")
+		req.Header.Set("User-Agent", "aws-sdk-js/1.0.0 ua/2.1 os/linux lang/js md/nodejs#22.22.0 api/codewhispererruntime#1.0.0 m/N,E KiroIDE-"+kiroRESTIDEVersion+"-kiroclient")
+		req.Header.Set("x-amz-user-agent", "aws-sdk-js/1.0.0 KiroIDE-"+kiroRESTIDEVersion+"-kiroclient")
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -237,7 +237,8 @@ func queryGetEndpoint(client interface {
 	req, _ := fhttp.NewRequest("GET", url, nil)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Authorization", "Bearer "+access)
-	req.Header.Set("User-Agent", "aws-sdk-js/1.0.18 ua/2.1 os/windows lang/js md/nodejs#20.16.0 api/codewhispererstreaming#1.0.18 m/E KiroIDE-0.6.18")
+	req.Header.Set("User-Agent", "aws-sdk-js/1.0.0 ua/2.1 os/linux lang/js md/nodejs#22.22.0 api/codewhispererruntime#1.0.0 m/N,E KiroIDE-"+kiroRESTIDEVersion+"-kiroclient")
+	req.Header.Set("x-amz-user-agent", "aws-sdk-js/1.0.0 KiroIDE-"+kiroRESTIDEVersion+"-kiroclient")
 
 	resp, err := client.Do(req)
 	if err != nil {

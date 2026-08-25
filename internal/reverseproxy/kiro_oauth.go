@@ -456,9 +456,9 @@ type KiroModelInfo struct {
 func ListKiroAvailableModels(accessToken, profileArn string) ([]KiroModelInfo, error) {
 	endpoint := "https://codewhisperer.us-east-1.amazonaws.com"
 
-	payload := map[string]interface{}{"origin": "AI_EDITOR"}
-	if arn := EffectiveProfileArn(profileArn); arn != "" {
-		payload["profileArn"] = arn
+	payload := map[string]interface{}{
+		"origin":     "AI_EDITOR",
+		"profileArn": UsageQueryProfileArn(profileArn),
 	}
 	body, _ := json.Marshal(payload)
 	status, respBody, err := kiroRefreshPOST(endpoint, map[string]string{

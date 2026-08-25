@@ -100,11 +100,12 @@ func (c *KiroClient) CheckHealth(account *Account) error {
 }
 
 // classifyHealthError 按 9router 语义将健康检测错误细分为状态 + 细分码
-//   AUTH(401/403)   = 令牌失效/吊销 → 死（unhealthy）
-//   429             = 上游限流 → 软失败，账号保留可用（9router: rate_limit 走 backoff 冷却，连接保持 active）
-//   502/503/504     = 上游不可用 → 异常（unhealthy，显示具体码）
-//   其他 HTTP ≥400  = 异常（显示数字码）
-//   NET             = 网络错误 → 异常
+//
+//	AUTH(401/403)   = 令牌失效/吊销 → 死（unhealthy）
+//	429             = 上游限流 → 软失败，账号保留可用（9router: rate_limit 走 backoff 冷却，连接保持 active）
+//	502/503/504     = 上游不可用 → 异常（unhealthy，显示具体码）
+//	其他 HTTP ≥400  = 异常（显示数字码）
+//	NET             = 网络错误 → 异常
 func classifyHealthError(err error) (healthStatus, healthCode string) {
 	if err == nil {
 		return "healthy", ""
@@ -137,74 +138,67 @@ func classifyHealthError(err error) (healthStatus, healthCode string) {
 	return "unhealthy", "NET"
 }
 
-// GetUsage 查询账号额度（参考 9router kiro.js 实现）
-func usageProfileArn(arn string) string {
+const kiroRESTIDEVersion = "2.3.0"
+const builderIDProfileARN = "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX"
+
+func usageQueryProfileArn(arn string) string {
 	arn = strings.TrimSpace(arn)
-	if arn == "" || strings.Contains(arn, "AAAACCCCXXXX") {
-		return ""
+	if arn == "" {
+		return builderIDProfileARN
 	}
 	return arn
 }
 
-func usageLimitsURL(region, profileArn string) string {
-	u := fmt.Sprintf("%s/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST", qUsageEndpoint(region))
-	if arn := usageProfileArn(profileArn); arn != "" {
-		u += "&profileArn=" + url.QueryEscape(arn)
-	}
-	return u
+func applyQRESTHeaders(h fhttp.Header, accessToken string) {
+	h.Set("Authorization", "Bearer "+accessToken)
+	h.Set("Accept", "application/json")
+	h.Set("User-Agent", "aws-sdk-js/1.0.0 ua/2.1 os/linux lang/js md/nodejs#22.22.0 api/codewhispererruntime#1.0.0 m/N,E KiroIDE-"+kiroRESTIDEVersion+"-kiroclient")
+	h.Set("x-amz-user-agent", "aws-sdk-js/1.0.0 KiroIDE-"+kiroRESTIDEVersion+"-kiroclient")
 }
 
+func usageLimitsURL(region, profileArn string) string {
+	return fmt.Sprintf("%s/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST&isEmailRequired=true&profileArn=%s",
+		qUsageEndpoint(region), url.QueryEscape(usageQueryProfileArn(profileArn)))
+}
+
+// GetUsage 查询账号额度（参考 9router kiro.js 实现）
 func (c *KiroClient) GetUsage(account *Account, accessToken string) (map[string]interface{}, error) {
 	arn := ""
 	if account != nil {
-		arn = usageProfileArn(account.ProfileArn)
+		arn = usageQueryProfileArn(account.ProfileArn)
+	} else {
+		arn = usageQueryProfileArn("")
 	}
-	makeAttempts := func(a string) []struct {
+	attempts := []struct {
 		name string
 		run  func() (*fhttp.Response, error)
-	} {
-		return []struct {
-			name string
-			run  func() (*fhttp.Response, error)
-		}{
-			{
-				name: "codewhisperer-post",
-				run: func() (*fhttp.Response, error) {
-					payload := map[string]interface{}{
-						"origin":       "AI_EDITOR",
-						"resourceType": "AGENTIC_REQUEST",
-					}
-					if a != "" {
-						payload["profileArn"] = a
-					}
-					body, _ := json.Marshal(payload)
-					req, _ := fhttp.NewRequest("POST", cwUsageEndpoint(account.Region), bytes.NewReader(body))
-					req.Header.Set("Authorization", "Bearer "+accessToken)
-					req.Header.Set("Content-Type", "application/x-amz-json-1.0")
-					req.Header.Set("x-amz-target", "AmazonCodeWhispererService.GetUsageLimits")
-					req.Header.Set("Accept", "application/json")
-					return c.httpClient.Do(req)
-				},
+	}{
+		{
+			name: "codewhisperer-post",
+			run: func() (*fhttp.Response, error) {
+				payload := map[string]interface{}{
+					"origin":       "AI_EDITOR",
+					"resourceType": "AGENTIC_REQUEST",
+					"profileArn":   arn,
+				}
+				body, _ := json.Marshal(payload)
+				req, _ := fhttp.NewRequest("POST", cwUsageEndpoint(account.Region), bytes.NewReader(body))
+				req.Header.Set("Authorization", "Bearer "+accessToken)
+				req.Header.Set("Content-Type", "application/x-amz-json-1.0")
+				req.Header.Set("x-amz-target", "AmazonCodeWhispererService.GetUsageLimits")
+				req.Header.Set("Accept", "application/json")
+				return c.httpClient.Do(req)
 			},
-			{
-				name: "q-get",
-				run: func() (*fhttp.Response, error) {
-					req, _ := fhttp.NewRequest("GET", usageLimitsURL(account.Region, a), nil)
-					req.Header.Set("Authorization", "Bearer "+accessToken)
-					req.Header.Set("Accept", "application/json")
-					return c.httpClient.Do(req)
-				},
+		},
+		{
+			name: "q-get",
+			run: func() (*fhttp.Response, error) {
+				req, _ := fhttp.NewRequest("GET", usageLimitsURL(account.Region, arn), nil)
+				applyQRESTHeaders(req.Header, accessToken)
+				return c.httpClient.Do(req)
 			},
-		}
+		},
 	}
-	var attempts []struct {
-		name string
-		run  func() (*fhttp.Response, error)
-	}
-	if arn != "" {
-		attempts = append(attempts, makeAttempts(arn)...)
-	}
-	attempts = append(attempts, makeAttempts("")...)
 
 	var lastErr error
 	for _, attempt := range attempts {
@@ -346,11 +340,8 @@ func getFloat(m map[string]interface{}, key string) float64 {
 
 // GetAvailableModels 获取可用模型列表
 func availableModelsURL(region, profileArn string) string {
-	u := fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR", qUsageEndpoint(region))
-	if arn := usageProfileArn(profileArn); arn != "" {
-		u += "&profileArn=" + url.QueryEscape(arn)
-	}
-	return u
+	return fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR&profileArn=%s",
+		qUsageEndpoint(region), url.QueryEscape(usageQueryProfileArn(profileArn)))
 }
 
 func (c *KiroClient) GetAvailableModels(account *Account, accessToken string) []string {
@@ -371,20 +362,17 @@ func (c *KiroClient) GetAvailableModels(account *Account, accessToken string) []
 	}
 	arn := ""
 	if account != nil {
-		arn = usageProfileArn(account.ProfileArn)
+		arn = usageQueryProfileArn(account.ProfileArn)
+	} else {
+		arn = usageQueryProfileArn("")
 	}
-	urls := make([]string, 0, 2)
-	if arn != "" {
-		urls = append(urls, availableModelsURL(account.Region, arn))
-	}
-	urls = append(urls, availableModelsURL(account.Region, ""))
+	urls := []string{availableModelsURL(account.Region, arn)}
 	for _, u := range urls {
 		req, err := fhttp.NewRequest("GET", u, nil)
 		if err != nil {
 			continue
 		}
-		req.Header.Set("Authorization", "Bearer "+accessToken)
-		req.Header.Set("Accept", "application/json")
+		applyQRESTHeaders(req.Header, accessToken)
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			continue
@@ -491,10 +479,11 @@ func (c *KiroClient) UpdateAccountInfo(account *Account) error {
 }
 
 // NeedsRefresh 增量刷新判定（9router 惰性思想）：只刷需要刷的账号
-//   AUTH 死号不自动重试（省请求，留手动全量）
-//   429 软失败 → 60s 后重试（限流恢复快）
-//   其余异常（NET/5xx/UNKNOWN）→ 立即重试（瞬时错误尝试恢复）
-//   健康且检测时间 < ttl（默认 5min）→ 跳过
+//
+//	AUTH 死号不自动重试（省请求，留手动全量）
+//	429 软失败 → 60s 后重试（限流恢复快）
+//	其余异常（NET/5xx/UNKNOWN）→ 立即重试（瞬时错误尝试恢复）
+//	健康且检测时间 < ttl（默认 5min）→ 跳过
 func NeedsRefresh(acc *Account, now time.Time, ttl time.Duration) bool {
 	if acc == nil {
 		return false

@@ -138,7 +138,7 @@ func (p *AccountPool) RefreshQuota() {
 				}
 			}
 		}
-		used, limit, resetAt, err := quotaFunc(token, region, proxy, arn)
+		used, limit, resetAt, err := quotaFunc(token, region, proxy, UsageQueryProfileArn(arn))
 		if err != nil {
 			continue
 		}

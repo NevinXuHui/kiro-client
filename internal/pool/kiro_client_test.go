@@ -2,8 +2,12 @@ package pool
 
 import (
 	"errors"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
+
+	fhttp "github.com/bogdanfinn/fhttp"
 )
 
 // TestNeedsRefresh 验证增量刷新判定（9router 惰性思想）
@@ -60,5 +64,42 @@ func TestClassifyHealthError(t *testing.T) {
 		if status != c.status || code != c.code {
 			t.Errorf("%s: got (%s,%s), want (%s,%s)", c.name, status, code, c.status, c.code)
 		}
+	}
+}
+
+func TestUsageQueryProfileArn(t *testing.T) {
+	if got := usageQueryProfileArn(""); got != builderIDProfileARN {
+		t.Fatalf("empty ARN should default to placeholder, got %q", got)
+	}
+	if got := usageQueryProfileArn(builderIDProfileARN); got != builderIDProfileARN {
+		t.Fatalf("placeholder must be sent as-is, got %q", got)
+	}
+}
+
+func TestUsageLimitsURLSendsPlaceholder(t *testing.T) {
+	u := usageLimitsURL("us-east-1", "")
+	if !strings.Contains(u, "profileArn="+url.QueryEscape(builderIDProfileARN)) {
+		t.Fatalf("placeholder must be sent: %s", u)
+	}
+	if !strings.Contains(u, "isEmailRequired=true") {
+		t.Fatalf("missing isEmailRequired: %s", u)
+	}
+}
+
+func TestAvailableModelsURLSendsPlaceholder(t *testing.T) {
+	u := availableModelsURL("us-east-1", "")
+	if !strings.Contains(u, "profileArn="+url.QueryEscape(builderIDProfileARN)) {
+		t.Fatalf("placeholder must be sent: %s", u)
+	}
+}
+
+func TestApplyQRESTHeadersPinsModelsUA(t *testing.T) {
+	h := make(fhttp.Header)
+	applyQRESTHeaders(h, "tok")
+	if got := h.Get("User-Agent"); !strings.Contains(got, "KiroIDE-2.3.0-") {
+		t.Fatalf("User-Agent must pin 2.3.0, got %q", got)
+	}
+	if got := h.Get("x-amz-user-agent"); !strings.Contains(got, "KiroIDE-2.3.0-") {
+		t.Fatalf("x-amz-user-agent must pin 2.3.0, got %q", got)
 	}
 }

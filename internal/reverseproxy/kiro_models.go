@@ -13,7 +13,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
-	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -192,31 +191,18 @@ func kiroBuildVariants(upstream, displayName string) []KiroCatalogModel {
 // 返回 API 响应的 .models 数组；网络/HTTP 错误返回 error。
 func kiroFetchCatalogRaw(credentials *KiroCredential, proxy string) ([]map[string]interface{}, error) {
 	profileArn := ""
-	if credentials != nil {
-		profileArn = credentials.ProviderSpecificData.ProfileArn
-	}
-	region := kiroRegionFromProfileArn(profileArn)
-	arn := EffectiveProfileArn(profileArn)
-	if arn == "" && credentials != nil && credentials.AccessToken != "" {
-		regionForResolve := region
-		if regionForResolve == "" {
-			regionForResolve = kiroDefaultRegion
-		}
-		if resolved, err := ListAvailableProfiles(credentials.AccessToken, regionForResolve, proxy); err == nil {
-			arn = EffectiveProfileArn(resolved)
-		}
-	}
-	params := "origin=AI_EDITOR"
-	if arn != "" {
-		params += "&profileArn=" + url.QueryEscape(arn)
-	}
-	url := fmt.Sprintf("https://q.%s.amazonaws.com/ListAvailableModels?%s", region, params)
-
-	headers := BuildKiroFingerprintHeaders(credentials)
 	accessToken := ""
 	if credentials != nil {
+		profileArn = credentials.ProviderSpecificData.ProfileArn
 		accessToken = credentials.AccessToken
 	}
+	region := kiroRegionFromProfileArn(profileArn)
+	arn := ResolveUsageProfileArn(accessToken, region, proxy, profileArn)
+	url := AvailableModelsURL(region, arn)
+
+	headers := BuildKiroFingerprintHeaders(credentials)
+	headers["User-Agent"] = strings.Replace(headers["User-Agent"], "KiroIDE-"+kiroVersion+"-", "KiroIDE-"+kiroRESTIDEVersion+"-", 1)
+	headers["x-amz-user-agent"] = strings.Replace(headers["x-amz-user-agent"], "KiroIDE-"+kiroVersion+"-", "KiroIDE-"+kiroRESTIDEVersion+"-", 1)
 	headers["Authorization"] = "Bearer " + accessToken
 
 	client := newModelsClient(proxy)
@@ -249,12 +235,6 @@ func kiroFetchCatalogRaw(credentials *KiroCredential, proxy string) ([]map[strin
 	body, status, err := fetch(url)
 	if err != nil {
 		return nil, err
-	}
-	if status != 200 && arn != "" {
-		body, status, err = fetch(AvailableModelsURL(region, ""))
-		if err != nil {
-			return nil, err
-		}
 	}
 	if status != 200 {
 		text := strings.TrimSpace(string(body))
