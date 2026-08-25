@@ -375,7 +375,26 @@
                   <span data-i18n="accounts.outlookTitle">Outlook</span>
                   <div class="btn-group">
                     <span class="btn btn-primary btn-sm" onclick="openOutlookModal()" data-i18n="accounts.addAccount">添加账号</span>
-                    <span class="btn btn-outline btn-sm" onclick="importOutlookFile()"><i data-lucide="folder-open"></i><span>导入文件</span></span>
+                    <div class="dropdown" style="position:relative;display:inline-block;">
+                      <span class="btn btn-outline btn-sm" onclick="toggleExportMenu(event)">
+                        <i data-lucide="download"></i>
+                        <span>导出</span>
+                        <i data-lucide="chevron-down" style="width:14px;height:14px;margin-left:4px;"></i>
+                      </span>
+                      <div class="dropdown-menu" id="export-menu" style="display:none;">
+                        <div class="dropdown-item" onclick="exportOutlookAccounts('json', 'all')">导出全部 (JSON)</div>
+                        <div class="dropdown-item" onclick="exportOutlookAccounts('csv', 'all')">导出全部 (CSV)</div>
+                        <div class="dropdown-item" onclick="exportOutlookAccounts('txt', 'all')">导出全部 (TXT)</div>
+                        <div class="dropdown-divider"></div>
+                        <div class="dropdown-item" onclick="exportOutlookAccounts('json', 'unregistered')">仅未注册 (JSON)</div>
+                        <div class="dropdown-item" onclick="exportOutlookAccounts('json', 'registered')">仅已注册 (JSON)</div>
+                        <div class="dropdown-item" onclick="exportOutlookAccounts('json', 'success')">仅成功 (JSON)</div>
+                      </div>
+                    </div>
+                    <span class="btn btn-outline btn-sm" onclick="openImportModal()">
+                      <i data-lucide="upload"></i>
+                      <span>导入</span>
+                    </span>
                     <span class="btn btn-outline btn-sm" onclick="clearRegisteredOutlookAccounts()" data-i18n="accounts.clearRegistered">清除已注册</span>
                     <span class="btn btn-outline btn-sm" style="color:var(--red)" onclick="clearAllOutlookAccounts()" data-i18n="accounts.clearAllTitle">清空全部</span>
                   </div>
@@ -1038,5 +1057,75 @@
   <script src="js/models.js"></script>
   <script src="js/license.js"></script>
   <script>document.addEventListener('DOMContentLoaded', function() { if (window.lucide) lucide.createIcons(); });</script>
+
+  <!-- 导入账号模态框 -->
+  <div class="modal-o" id="import-modal">
+    <div class="modal" style="max-width:600px;">
+      <div class="modal-hd">
+        <span>导入 Outlook 账号</span>
+        <span class="x" onclick="closeImportModal()">&times;</span>
+      </div>
+      <div class="modal-bd">
+        <div class="frm">
+          <label class="frm-lbl">选择文件</label>
+          <div style="display:flex;gap:12px;align-items:center;">
+            <input type="file" id="import-file-input" accept=".json,.csv,.txt" onchange="handleFileSelect(event)" style="display:none;">
+            <button class="btn btn-outline" onclick="triggerFileSelect()" style="width:100%;">
+              <i data-lucide="upload"></i>
+              <span>选择文件 (JSON/CSV/TXT)</span>
+            </button>
+          </div>
+          <div style="margin-top:12px;padding:12px;background:var(--surface-2);border-radius:6px;font-size:12px;color:var(--text-3);">
+            <div style="margin-bottom:8px;font-weight:500;color:var(--text);">支持的格式：</div>
+            <div style="line-height:1.8;">
+              <div><strong>JSON:</strong> 完整的账号信息（推荐）</div>
+              <div><strong>CSV:</strong> Excel 兼容格式</div>
+              <div><strong>TXT:</strong> 每行一个账号（邮箱----密码----ClientID----RefreshToken）</div>
+            </div>
+          </div>
+        </div>
+        <div id="import-result" style="display:none;margin-top:16px;padding:16px;background:var(--surface-2);border-radius:6px;border:1px solid var(--border);"></div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-outline" onclick="closeImportModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    /* 下拉菜单样式 */
+    .dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    .dropdown-menu {
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      min-width: 180px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      z-index: 1000;
+      padding: 4px 0;
+    }
+    .dropdown-item {
+      padding: 8px 16px;
+      font-size: 13px;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .dropdown-item:hover {
+      background: var(--surface-2);
+    }
+    .dropdown-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+  </style>
+
 </body>
 </html>

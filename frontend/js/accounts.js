@@ -374,6 +374,34 @@ async function importOutlookFile() {
   } catch(e) { showToast(_accT('accounts.importFailed', '导入失败') + ': ' + e.message, 'error'); }
 }
 
+// ===== 导入文件（旧方法，保持兼容） =====
+async function importOutlookFile() {
+  openImportModal();
+}
+
+// ===== 导出菜单控制 =====
+function toggleExportMenu(event) {
+  event.stopPropagation();
+  var menu = document.getElementById('export-menu');
+  if (!menu) return;
+
+  var isVisible = menu.style.display !== 'none';
+  menu.style.display = isVisible ? 'none' : 'block';
+
+  // 点击其他地方关闭菜单
+  if (!isVisible) {
+    setTimeout(function() {
+      document.addEventListener('click', closeExportMenu);
+    }, 0);
+  }
+}
+
+function closeExportMenu() {
+  var menu = document.getElementById('export-menu');
+  if (menu) menu.style.display = 'none';
+  document.removeEventListener('click', closeExportMenu);
+}
+
 // ===== 加载/渲染 =====
 async function loadOutlookAccountsList() {
   try {
