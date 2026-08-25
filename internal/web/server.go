@@ -157,15 +157,20 @@ func (s *Server) HandleRegisterStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 简单状态响应
-	status := map[string]interface{}{
-		"running":   false,
-		"completed": 0,
-		"failed":    0,
-		"total":     0,
+	// 从 task.Manager 获取真实状态
+	status := task.Manager.GetStatus()
+	s.respondJSON(w, status)
+}
+
+// HandleGetLogs 获取日志
+func (s *Server) HandleGetLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
 	}
 
-	s.respondJSON(w, status)
+	logs := task.Manager.GetLogs()
+	s.respondJSON(w, logs)
 }
 
 // HandlePoolsList 获取号池列表

@@ -113,6 +113,11 @@ class KiroAPI {
     return this.get('/register/status');
   }
 
+  // 获取日志
+  async getLogs() {
+    return this.get('/logs');
+  }
+
   // ===== 号池相关 API =====
 
   // 获取号池列表

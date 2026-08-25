@@ -33,6 +33,7 @@ func main() {
 	mux.HandleFunc("/api/register/start", server.HandleRegisterStart)
 	mux.HandleFunc("/api/register/stop", server.HandleRegisterStop)
 	mux.HandleFunc("/api/register/status", server.HandleRegisterStatus)
+	mux.HandleFunc("/api/logs", server.HandleGetLogs)
 	mux.HandleFunc("/api/pools/list", server.HandlePoolsList)
 	mux.HandleFunc("/api/pools/export", server.HandlePoolsExport)
 	mux.HandleFunc("/api/pools/refresh", server.HandlePoolsRefresh)

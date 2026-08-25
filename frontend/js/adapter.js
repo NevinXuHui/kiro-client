@@ -41,6 +41,25 @@ window.go = {
         }
       },
 
+      GetLogs: async function() {
+        try {
+          return await window.kiroAPI.getLogs();
+        } catch (err) {
+          console.error('GetLogs error:', err);
+          return [];
+        }
+      },
+
+      GetManualRegisterStatus: async function() {
+        // Web 版本暂时返回默认状态
+        return { running: false };
+      },
+
+      StopManualRegister: async function() {
+        // Web 版本暂不支持
+        return { success: true };
+      },
+
       // 号池相关
       ListPools: async function() {
         try {
