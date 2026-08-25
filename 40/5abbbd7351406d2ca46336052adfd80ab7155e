@@ -1,0 +1,121 @@
+internal/reverseproxy/proxy.go
+  e6c611d58b9d586b 27-28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "405abbbd7351406d2ca46336052adfd80ab7155e",
+  "prompts": {
+    "e6c611d58b9d586b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4bb9589b-8b9f-4e64-8afe-67364947b4ea",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 72,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 471,
+    "git_diff_deleted_lines": 137,
+    "ai_additions": 2,
+    "ai_accepted": 2,
+    "BYMC": 465,
+    "mixed_additions": 0,
+    "BYAC": 2,
+    "BYRC": 0,
+    "per_file": {
+      "internal/core/verify.go": {
+        "BYMC": [
+          "9",
+          "62-63",
+          "68-71",
+          "126-193"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/pool/kiro_client.go": {
+        "BYMC": [
+          "8",
+          "141-156",
+          "158-162",
+          "165-187",
+          "189-196",
+          "198",
+          "200-207",
+          "348-357",
+          "369-420",
+          "487"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/pool/pool.go": {
+        "BYMC": [
+          "39-40"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/reverseproxy/kiro_models.go": {
+        "BYMC": [
+          "16",
+          "199-208",
+          "210-211",
+          "223-244",
+          "247",
+          "249",
+          "253-256",
+          "259",
+          "262",
+          "264"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/reverseproxy/kiro_oauth.go": {
+        "BYMC": [
+          "459-463"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/reverseproxy/kiro_usage.go": {
+        "BYMC": [
+          "1-149"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/reverseproxy/kiro_usage_test.go": {
+        "BYMC": [
+          "1-51"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/reverseproxy/pool.go": {
+        "BYMC": [
+          "128-141"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/reverseproxy/proxy.go": {
+        "BYMC": [],
+        "BYAC": [
+          "27-28"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787668177,
+  "requirement_id": ""
+}
