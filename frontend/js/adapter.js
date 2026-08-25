@@ -1,5 +1,45 @@
 // Wails API 适配器 - 将 Wails 调用转换为 Web API 调用
 
+function downloadJSONFile(filename, content) {
+  var blob = new Blob([content], { type: 'application/json;charset=utf-8' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename || 'export.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function pickTextFile(accept) {
+  return new Promise(function(resolve) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept || '.json,application/json';
+    var settled = false;
+    function done(value) {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    }
+    input.addEventListener('cancel', function() { done(''); });
+    input.onchange = function() {
+      var file = input.files && input.files[0];
+      if (!file) { done(''); return; }
+      var reader = new FileReader();
+      reader.onload = function() {
+        window._kiroImportText = String(reader.result || '');
+        done(file.name || 'upload.json');
+      };
+      reader.onerror = function() { done(''); };
+      reader.readAsText(file);
+    };
+    input.click();
+  });
+}
+
+
 // 创建兼容的 Wails API 对象
 window.go = {
   main: {
@@ -61,15 +101,6 @@ window.go = {
         }
       },
 
-      GetLogs: async function() {
-        try {
-          return await window.kiroAPI.getLogs();
-        } catch (err) {
-          console.error('GetLogs error:', err);
-          return [];
-        }
-      },
-
       GetManualRegisterStatus: async function() {
         // Web 版本暂时返回默认状态
         return { running: false };
@@ -104,6 +135,87 @@ window.go = {
           return await window.kiroAPI.refreshPool(poolName);
         } catch (err) {
           console.error('RefreshPool error:', err);
+          return { error: err.message };
+        }
+      },
+
+      GetPool: async function(poolID) {
+        try {
+          return await window.kiroAPI.getPool(poolID);
+        } catch (err) {
+          console.error('GetPool error:', err);
+          return { error: err.message };
+        }
+      },
+
+      RefreshAllAccountsInfo: async function(poolID) {
+        try {
+          return await window.kiroAPI.refreshAllAccounts(poolID);
+        } catch (err) {
+          console.error('RefreshAllAccountsInfo error:', err);
+          return { error: err.message };
+        }
+      },
+
+      RefreshAccountInfo: async function(poolID, email) {
+        try {
+          return await window.kiroAPI.refreshAccount(poolID, email);
+        } catch (err) {
+          console.error('RefreshAccountInfo error:', err);
+          return { error: err.message };
+        }
+      },
+
+      ExportPoolAccounts: async function(poolID) {
+        try {
+          var result = await window.kiroAPI.exportPoolAccounts(poolID);
+          if (!result || result.error) return result || { error: 'export failed' };
+          downloadJSONFile(result.filename, result.content);
+          return { success: true, count: result.count };
+        } catch (err) {
+          console.error('ExportPoolAccounts error:', err);
+          return { error: err.message };
+        }
+      },
+
+      ExportPoolAccount: async function(poolID, email) {
+        try {
+          var result = await window.kiroAPI.exportPoolAccount(poolID, email);
+          if (!result || result.error) return result || { error: 'export failed' };
+          downloadJSONFile(result.filename, result.content);
+          return { success: true, count: result.count || 1 };
+        } catch (err) {
+          console.error('ExportPoolAccount error:', err);
+          return { error: err.message };
+        }
+      },
+
+      UpdatePool: async function(id, name, strategy, accountsJSON) {
+        try {
+          return await window.kiroAPI.updatePool(id, name, strategy, accountsJSON);
+        } catch (err) {
+          console.error('UpdatePool error:', err);
+          return { error: err.message };
+        }
+      },
+
+      DeletePool: async function(id) {
+        try {
+          return await window.kiroAPI.deletePool(id);
+        } catch (err) {
+          console.error('DeletePool error:', err);
+          return { error: err.message };
+        }
+      },
+
+      ImportToDefaultPool: async function(path) {
+        try {
+          var data = window._kiroImportText || '';
+          window._kiroImportText = '';
+          if (!data) return { error: '未选择文件' };
+          return await window.kiroAPI.importToDefaultPool(data);
+        } catch (err) {
+          console.error('ImportToDefaultPool error:', err);
           return { error: err.message };
         }
       },
@@ -298,8 +410,7 @@ window.go = {
       },
 
       SelectOutlookFile: async function() {
-        // Web 版本无法直接选择文件
-        return '';
+        return pickTextFile('.json,application/json');
       },
 
       ImportOutlookFile: async function(path) {

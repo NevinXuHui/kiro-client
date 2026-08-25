@@ -113,16 +113,11 @@ class KiroAPI {
     return this.get('/register/status');
   }
 
-<<<<<<< HEAD
   // 获取日志
-=======
->>>>>>> d30d9ea71a62414184b1134dad295f267a744b94
   async getLogs() {
     return this.get('/logs');
   }
 
-<<<<<<< HEAD
-=======
   // ===== Outlook 账号 =====
 
   async listOutlook() {
@@ -167,7 +162,6 @@ class KiroAPI {
     return this.post('/httpapi/clear-registered', {});
   }
 
->>>>>>> d30d9ea71a62414184b1134dad295f267a744b94
   // ===== 号池相关 API =====
 
   // 获取号池列表
@@ -180,9 +174,41 @@ class KiroAPI {
     return this.post('/pools/export', { poolName, format });
   }
 
-  // 刷新号池
+  // 刷新号池全部账号
   async refreshPool(poolName) {
     return this.post('/pools/refresh', { poolName });
+  }
+
+  async getPool(id) {
+    return this.get('/pools/get?id=' + encodeURIComponent(id));
+  }
+
+  async refreshAllAccounts(poolID) {
+    return this.post('/pools/refresh', { poolID });
+  }
+
+  async refreshAccount(poolID, email) {
+    return this.post('/pools/refresh-account', { poolID, email });
+  }
+
+  async exportPoolAccounts(poolID) {
+    return this.post('/pools/export-accounts', { poolID });
+  }
+
+  async exportPoolAccount(poolID, email) {
+    return this.post('/pools/export-account', { poolID, email });
+  }
+
+  async updatePool(id, name, strategy, accountsJSON) {
+    return this.post('/pools/update', { id, name, strategy, accountsJSON });
+  }
+
+  async deletePool(id) {
+    return this.post('/pools/delete', { id });
+  }
+
+  async importToDefaultPool(data) {
+    return this.post('/pools/import', { data });
   }
 
   // ===== 代理池相关 API =====

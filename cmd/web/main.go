@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,9 +26,9 @@ func main() {
 	// 设置路由
 	mux := http.NewServeMux()
 
-	// 静态文件服务
+	// 静态文件服务（HTML/JS/CSS 禁用缓存，避免浏览器继续用旧脚本）
 	fs := http.FileServer(http.Dir("frontend"))
-	mux.Handle("/", fs)
+	mux.Handle("/", noCacheStatic(fs))
 
 	// API 路由
 	mux.HandleFunc("/api/register/start", server.HandleRegisterStart)
@@ -35,8 +36,15 @@ func main() {
 	mux.HandleFunc("/api/register/status", server.HandleRegisterStatus)
 	mux.HandleFunc("/api/logs", server.HandleLogs)
 	mux.HandleFunc("/api/pools/list", server.HandlePoolsList)
+	mux.HandleFunc("/api/pools/get", server.HandlePoolGet)
 	mux.HandleFunc("/api/pools/export", server.HandlePoolsExport)
 	mux.HandleFunc("/api/pools/refresh", server.HandlePoolsRefresh)
+	mux.HandleFunc("/api/pools/refresh-account", server.HandlePoolRefreshAccount)
+	mux.HandleFunc("/api/pools/export-accounts", server.HandlePoolExportAccounts)
+	mux.HandleFunc("/api/pools/export-account", server.HandlePoolExportAccount)
+	mux.HandleFunc("/api/pools/update", server.HandlePoolUpdate)
+	mux.HandleFunc("/api/pools/delete", server.HandlePoolDelete)
+	mux.HandleFunc("/api/pools/import", server.HandlePoolImport)
 	mux.HandleFunc("/api/proxy/list", server.HandleProxyList)
 	mux.HandleFunc("/api/proxy/batch-add", server.HandleProxyBatchAdd)
 	mux.HandleFunc("/api/proxy/test", server.HandleProxyTest)
@@ -69,7 +77,7 @@ func main() {
 		Addr:         addr,
 		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 10 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}
 
@@ -113,6 +121,19 @@ func corsMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+// noCacheStatic 对 HTML/JS/CSS 禁用缓存，确保前端改动能立刻生效。
+func noCacheStatic(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if path == "/" || strings.HasSuffix(path, ".html") || strings.HasSuffix(path, ".js") || strings.HasSuffix(path, ".css") {
+			w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+			w.Header().Set("Pragma", "no-cache")
+			w.Header().Set("Expires", "0")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

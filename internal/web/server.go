@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 
 	"reg_go/internal/email"
+	"reg_go/internal/pool"
 	"reg_go/internal/proxy"
 	"reg_go/internal/reverseproxy"
 	"reg_go/internal/storage"
@@ -22,6 +24,7 @@ type Server struct {
 	// 代理服务器
 	proxyServer *reverseproxy.ProxyServer
 	proxyMu     sync.Mutex
+	poolMu      sync.Mutex
 
 	// WebSocket 连接池
 	wsClients   map[*websocket.Conn]bool
@@ -194,11 +197,13 @@ func (s *Server) HandlePoolsList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: 实现号池列表
-	pools := []map[string]interface{}{
-		{"name": "default", "count": 0},
+	mgr := pool.GetManager(storage.GetDataDir())
+	pools := mgr.List()
+	res := make([]map[string]interface{}, len(pools))
+	for i, p := range pools {
+		res[i] = poolToMap(p)
 	}
-	s.respondJSON(w, pools)
+	s.respondJSON(w, res)
 }
 
 // HandlePoolsExport 导出号池
@@ -234,20 +239,351 @@ func (s *Server) HandlePoolsRefresh(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
+		PoolID   string `json:"poolID"`
 		PoolName string `json:"poolName"`
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		s.respondJSON(w, map[string]interface{}{"error": "Invalid request body"})
 		return
 	}
 
-	// TODO: 实现刷新
-	result := map[string]interface{}{
-		"success": true,
-		"message": "Refresh not implemented yet",
+	mgr := pool.GetManager(storage.GetDataDir())
+	p, err := resolvePool(mgr, req.PoolID, req.PoolName)
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
 	}
-	s.respondJSON(w, result)
+
+	s.poolMu.Lock()
+	defer s.poolMu.Unlock()
+
+	client := pool.NewKiroClient()
+	successCount, failedCount := 0, 0
+	for _, acc := range p.Accounts {
+		if err := client.UpdateAccountInfo(acc); err != nil {
+			failedCount++
+		} else {
+			successCount++
+		}
+	}
+
+	if _, err = mgr.Update(p.ID, p.Name, p.Strategy, p.Accounts); err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": "Failed to save: " + err.Error()})
+		return
+	}
+
+	p, _ = mgr.Get(p.ID)
+	m := poolToMap(p)
+	m["refreshed"] = successCount
+	m["failed"] = failedCount
+	s.respondJSON(w, m)
+}
+
+func (s *Server) HandlePoolGet(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		s.respondJSON(w, map[string]interface{}{"error": "missing pool id"})
+		return
+	}
+	p, err := pool.GetManager(storage.GetDataDir()).Get(id)
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, poolToMap(p))
+}
+
+func (s *Server) HandlePoolRefreshAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		PoolID string `json:"poolID"`
+		Email  string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": "Invalid request body"})
+		return
+	}
+	if req.PoolID == "" || req.Email == "" {
+		s.respondJSON(w, map[string]interface{}{"error": "poolID and email are required"})
+		return
+	}
+
+	mgr := pool.GetManager(storage.GetDataDir())
+	p, err := mgr.Get(req.PoolID)
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+
+	var target *pool.Account
+	for _, acc := range p.Accounts {
+		if acc.Email == req.Email {
+			target = acc
+			break
+		}
+	}
+	if target == nil {
+		s.respondJSON(w, map[string]interface{}{"error": "Account not found"})
+		return
+	}
+
+	s.poolMu.Lock()
+	defer s.poolMu.Unlock()
+
+	client := pool.NewKiroClient()
+	if err := client.UpdateAccountInfo(target); err != nil {
+		s.respondJSON(w, map[string]interface{}{
+			"error":  err.Error(),
+			"status": target.HealthStatus,
+		})
+		return
+	}
+	if _, err = mgr.Update(p.ID, p.Name, p.Strategy, p.Accounts); err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": "Failed to save: " + err.Error()})
+		return
+	}
+	s.respondJSON(w, accountToMap(target))
+}
+
+
+func (s *Server) HandlePoolExportAccounts(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		PoolID string `json:"poolID"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": "Invalid request body"})
+		return
+	}
+	mgr := pool.GetManager(storage.GetDataDir())
+	p, err := mgr.Get(req.PoolID)
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	if len(p.Accounts) == 0 {
+		s.respondJSON(w, map[string]interface{}{"error": "暂无账号可导出"})
+		return
+	}
+	data, err := pool.ExportAccountsJSON(p.Accounts)
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, map[string]interface{}{
+		"success":  true,
+		"filename": "kiro-accounts-" + time.Now().Format("2006-01-02") + ".json",
+		"content":  string(data),
+		"count":    len(p.Accounts),
+	})
+}
+
+func (s *Server) HandlePoolExportAccount(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		PoolID string `json:"poolID"`
+		Email  string `json:"email"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": "Invalid request body"})
+		return
+	}
+	mgr := pool.GetManager(storage.GetDataDir())
+	p, err := mgr.Get(req.PoolID)
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	var acc *pool.Account
+	for _, item := range p.Accounts {
+		if item.Email == req.Email {
+			acc = item
+			break
+		}
+	}
+	if acc == nil {
+		s.respondJSON(w, map[string]interface{}{"error": "账号不存在"})
+		return
+	}
+	data, err := pool.ExportAccountsJSON([]*pool.Account{acc})
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, map[string]interface{}{
+		"success":  true,
+		"filename": pool.SanitizeFilename(acc.Email) + ".json",
+		"content":  string(data),
+		"count":    1,
+	})
+}
+
+func (s *Server) HandlePoolUpdate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID           string `json:"id"`
+		Name         string `json:"name"`
+		Strategy     string `json:"strategy"`
+		AccountsJSON string `json:"accountsJSON"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": "Invalid request body"})
+		return
+	}
+	if req.ID == "" {
+		s.respondJSON(w, map[string]interface{}{"error": "id is required"})
+		return
+	}
+	var accounts []*pool.Account
+	if req.AccountsJSON != "" {
+		if err := json.Unmarshal([]byte(req.AccountsJSON), &accounts); err != nil {
+			s.respondJSON(w, map[string]interface{}{"error": "Invalid accounts JSON: " + err.Error()})
+			return
+		}
+	}
+	p, err := pool.GetManager(storage.GetDataDir()).Update(req.ID, req.Name, pool.Strategy(req.Strategy), accounts)
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, poolToMap(p))
+}
+
+func (s *Server) HandlePoolDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		ID string `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": "Invalid request body"})
+		return
+	}
+	if req.ID == "" {
+		s.respondJSON(w, map[string]interface{}{"error": "id is required"})
+		return
+	}
+	if err := pool.GetManager(storage.GetDataDir()).Delete(req.ID); err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, map[string]interface{}{"success": true})
+}
+
+func (s *Server) HandlePoolImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Data string `json:"data"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": "Invalid request body"})
+		return
+	}
+	accounts, err := pool.ParseAccountJSON([]byte(req.Data))
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	if len(accounts) == 0 {
+		s.respondJSON(w, map[string]interface{}{"error": "未找到有效账号"})
+		return
+	}
+
+	mgr := pool.GetManager(storage.GetDataDir())
+	var defaultPool *pool.Pool
+	for _, p := range mgr.List() {
+		if p.Name == "默认号池" {
+			defaultPool = p
+			break
+		}
+	}
+	if defaultPool == nil {
+		created, err := mgr.Create("默认号池", pool.StrategySequential, accounts)
+		if err != nil {
+			s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+			return
+		}
+		s.respondJSON(w, poolToMap(created))
+		return
+	}
+	added := 0
+	for _, acc := range accounts {
+		if err := mgr.AddAccountToPool(defaultPool.ID, acc); err == nil {
+			added++
+		}
+	}
+	if added == 0 {
+		s.respondJSON(w, map[string]interface{}{"error": "所有账号已存在或验证失败"})
+		return
+	}
+	updated, err := mgr.Get(defaultPool.ID)
+	if err != nil {
+		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
+		return
+	}
+	s.respondJSON(w, poolToMap(updated))
+}
+
+func resolvePool(mgr *pool.Manager, id, name string) (*pool.Pool, error) {
+	if id != "" {
+		return mgr.Get(id)
+	}
+	if name != "" {
+		for _, p := range mgr.List() {
+			if p.Name == name {
+				return p, nil
+			}
+		}
+		return nil, fmt.Errorf("pool not found: %s", name)
+	}
+	return nil, fmt.Errorf("poolID or poolName is required")
+}
+
+func poolToMap(p *pool.Pool) map[string]interface{} {
+	if p == nil {
+		return map[string]interface{}{}
+	}
+	b, _ := json.Marshal(p)
+	var m map[string]interface{}
+	json.Unmarshal(b, &m)
+	if m == nil {
+		m = map[string]interface{}{}
+	}
+	return m
+}
+
+func accountToMap(a *pool.Account) map[string]interface{} {
+	if a == nil {
+		return map[string]interface{}{}
+	}
+	b, _ := json.Marshal(a)
+	var m map[string]interface{}
+	json.Unmarshal(b, &m)
+	if m == nil {
+		m = map[string]interface{}{}
+	}
+	return m
 }
 
 // HandleProxyList 列出代理池
