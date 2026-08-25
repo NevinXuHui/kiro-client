@@ -1,7 +1,6 @@
 package reverseproxy
 
 import (
-	"bytes"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -9,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	fhttp "github.com/bogdanfinn/fhttp"
 	tls_client "github.com/bogdanfinn/tls-client"
 	"github.com/bogdanfinn/tls-client/profiles"
 )
@@ -662,70 +660,6 @@ func truncate(s string, n int) string {
 	return s[:n] + "..."
 }
 
-// GetUsageLimits 璋冪敤 Kiro GetUsageLimits API 鏌ヨ棰濆害锛?router getKiroUsage 鍚屾锛夈€
-// 杩斿洖 creditUsed, creditLimit, resetAt, error銆
-func GetUsageLimits(accessToken, region, proxy string) (float64, float64, string, error) {
-	client := newClient(proxy)
-	// 灏濊瘯澶氫釜绔偣锛?router 鍚屾锛歝odewhisperer-post 鈫?q-get锛
-	type attempt struct {
-		name string
-		run  func() (*fhttp.Response, error)
-	}
-	attempts := []attempt{
-		{
-			name: "codewhisperer-post",
-			run: func() (*fhttp.Response, error) {
-				body, _ := json.Marshal(map[string]interface{}{
-					"origin":       "AI_EDITOR",
-					"resourceType": "AGENTIC_REQUEST",
-				})
-				url := fmt.Sprintf("https://codewhisperer.%s.amazonaws.com", region)
-				req, _ := fhttp.NewRequest("POST", url, bytes.NewReader(body))
-				req.Header.Set("Authorization", "Bearer "+accessToken)
-				req.Header.Set("Content-Type", "application/x-amz-json-1.0")
-				req.Header.Set("x-amz-target", "AmazonCodeWhispererService.GetUsageLimits")
-				req.Header.Set("Accept", "application/json")
-				return client.Do(req)
-			},
-		},
-		{
-			name: "q-get",
-			run: func() (*fhttp.Response, error) {
-				url := fmt.Sprintf("https://q.%s.amazonaws.com/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST", region)
-				req, _ := fhttp.NewRequest("GET", url, nil)
-				req.Header.Set("Authorization", "Bearer "+accessToken)
-				req.Header.Set("Accept", "application/json")
-				return client.Do(req)
-			},
-		},
-	}
-
-	var lastErr error
-	for _, a := range attempts {
-		resp, err := a.run()
-		if err != nil {
-			lastErr = fmt.Errorf("%s: %w", a.name, err)
-			continue
-		}
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		if resp.StatusCode != 200 {
-			lastErr = fmt.Errorf("%s: HTTP %d", a.name, resp.StatusCode)
-			continue
-		}
-		var data map[string]interface{}
-		if err := json.Unmarshal(respBody, &data); err != nil {
-			lastErr = fmt.Errorf("%s: parse error", a.name)
-			continue
-		}
-		used, limit, resetAt := parseUsageResponse(data)
-		return used, limit, resetAt, nil
-	}
-	if lastErr != nil {
-		return 0, 0, "", lastErr
-	}
-	return 0, 0, "", fmt.Errorf("all usage endpoints failed")
-}
 
 // parseUsageResponse 瑙ｆ瀽 GetUsageLimits 鍝嶅簲锛?router parseKiroQuotaData 鍚屾锛夈€
 func parseUsageResponse(data map[string]interface{}) (used, limit float64, resetAt string) {
@@ -760,12 +694,6 @@ func parseUsageResponse(data map[string]interface{}) (used, limit float64, reset
 	return used, limit, resetAt
 }
 
-// NewQuotaRefreshFunc 鍒涘缓 QuotaRefreshFunc锛?router 鍚屾锛歡etKiroUsage 鈫?GetUsageLimits锛
-func NewQuotaRefreshFunc() QuotaRefreshFunc {
-	return func(accessToken, region, proxy string) (float64, float64, string, error) {
-		return GetUsageLimits(accessToken, region, proxy)
-	}
-}
 
 func SanitizeModel(model string) string {
 	model = strings.TrimSpace(model)
