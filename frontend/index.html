@@ -849,6 +849,19 @@
                   <div class="frm">
                     <div class="frm-hint" data-i18n="settings.proxyPoolDesc">供注册机（Outlook 注册任务）使用的代理列表，按权重轮询选取。</div>
                   </div>
+                  <div id="proxy-pool-toolbar" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);cursor:pointer;">
+                      <input type="checkbox" id="proxy-select-all" onchange="toggleProxySelectAll(this.checked)" style="width:14px;height:14px;accent-color:var(--blue);">
+                      全选
+                    </label>
+                    <span id="proxy-selected-count" style="font-size:11px;color:var(--text-3);">已选 0</span>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="batchTestSelectedProxies()">批量测试</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="batchCopySelectedProxies()">复制选中</button>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="batchDeleteSelectedProxies()" style="color:var(--danger);">批量删除</button>
+                    <span style="flex:1"></span>
+                    <input type="number" id="proxy-batch-weight" min="1" max="100" value="50" title="批量权重 1-100" style="width:54px;text-align:center;padding:4px;border:1px solid var(--border);border-radius:4px;background:var(--bg-subtle);font-size:12px;">
+                    <button type="button" class="btn btn-outline btn-sm" onclick="batchSetSelectedProxyWeight()">设权重</button>
+                  </div>
                   <div id="proxy-pool-list"></div>
                   <div style="display:flex;gap:8px;margin-top:8px;">
                     <button class="btn btn-outline btn-sm" onclick="addEmptyProxyRow()">
@@ -942,6 +955,33 @@
           <button class="btn btn-outline" onclick="closeConfirmModal()" data-i18n="common.cancel">取消</button>
           <button class="btn btn-primary" id="confirm-action-btn" onclick="confirmAction()" data-i18n="common.confirm">确认</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 批量添加代理 -->
+  <div class="modal-o" id="batch-proxy-modal">
+    <div class="modal">
+      <div class="modal-hd">
+        <span>批量添加代理</span>
+        <span class="x" onclick="closeBatchAddProxyModal()">&times;</span>
+      </div>
+      <div class="modal-bd">
+        <div class="frm">
+          <label class="frm-lbl">每行一个代理地址，空行和 # 开头的注释会被跳过</label>
+          <textarea class="frm-inp" id="batch-proxy-input" rows="10" style="resize:vertical;font-family:var(--font-mono);font-size:12px;" placeholder="http://proxy1.example.com:8080&#10;http://user:pass@proxy2.example.com:8080&#10;socks5://proxy3.example.com:1080&#10;# 这是注释"></textarea>
+        </div>
+        <div class="frm" style="margin-top:12px;">
+          <label class="frm-lbl" for="batch-proxy-weight">默认权重（1-100）</label>
+          <input class="frm-inp" type="number" id="batch-proxy-weight" min="1" max="100" value="50" style="width:120px;">
+        </div>
+        <div style="font-size:10px;color:var(--text-3);line-height:1.5;margin-top:8px;">
+          支持 http://host:port、http://user:pass@host:port、socks5://host:port
+        </div>
+      </div>
+      <div class="modal-ft">
+        <button class="btn btn-outline" onclick="closeBatchAddProxyModal()">取消</button>
+        <button class="btn btn-primary" onclick="confirmBatchAddProxy()">添加</button>
       </div>
     </div>
   </div>

@@ -13,8 +13,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # 默认参数
-HOST="localhost"
-PORT="8080"
+HOST="0.0.0.0"
+PORT="9702"
 FORCE_BUILD=false
 SKIP_BUILD=false
 
@@ -28,15 +28,15 @@ show_help() {
 用法: $0 [选项]
 
 选项:
-  -h HOST        指定监听地址 (默认: localhost)
-  -p PORT        指定监听端口 (默认: 8080)
+  -h HOST        指定监听地址 (默认: 0.0.0.0)
+  -p PORT        指定监听端口 (默认: 9702)
   -b, --build    强制重新编译
   -s, --skip     跳过编译，直接运行
   --help         显示此帮助信息
 
 示例:
   $0                          # 使用默认配置运行
-  $0 -h 0.0.0.0 -p 8080       # 监听所有网卡，端口 8080
+  $0 -h 0.0.0.0 -p 9702       # 监听所有网卡，端口 9702
   $0 -b                       # 强制重新编译后运行
   $0 -s -h 0.0.0.0            # 跳过编译，使用现有二进制文件
 
@@ -182,6 +182,19 @@ echo ""
 echo -e "${GREEN}🚀 启动服务器...${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+
+# 端口被旧实例占用时先停掉，避免 bind: address already in use
+OLD_PIDS=$(pgrep -x kiro-web 2>/dev/null || true)
+if [ -n "$OLD_PIDS" ]; then
+    echo -e "${YELLOW}⚠️  检测到已有 kiro-web 进程 (PID: $OLD_PIDS)，正在停止...${NC}"
+    kill $OLD_PIDS 2>/dev/null || true
+    sleep 1
+    STILL=$(pgrep -x kiro-web 2>/dev/null || true)
+    if [ -n "$STILL" ]; then
+        kill -9 $STILL 2>/dev/null || true
+        sleep 1
+    fi
+fi
 
 # 设置信号处理
 trap 'echo ""; echo -e "${YELLOW}🛑 正在停止服务器...${NC}"; kill $SERVER_PID 2>/dev/null; wait $SERVER_PID 2>/dev/null; echo -e "${GREEN}✅ 服务器已停止${NC}"; exit 0' INT TERM

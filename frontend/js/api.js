@@ -113,11 +113,61 @@ class KiroAPI {
     return this.get('/register/status');
   }
 
+<<<<<<< HEAD
   // 获取日志
+=======
+>>>>>>> d30d9ea71a62414184b1134dad295f267a744b94
   async getLogs() {
     return this.get('/logs');
   }
 
+<<<<<<< HEAD
+=======
+  // ===== Outlook 账号 =====
+
+  async listOutlook() {
+    return this.get('/outlook/list');
+  }
+
+  async addOutlook(data) {
+    return this.post('/outlook/add', { data });
+  }
+
+  async deleteOutlook(email) {
+    return this.post('/outlook/delete', { email });
+  }
+
+  async clearOutlook() {
+    return this.post('/outlook/clear', {});
+  }
+
+  async clearRegisteredOutlook() {
+    return this.post('/outlook/clear-registered', {});
+  }
+
+  // ===== HTTP 邮箱 =====
+
+  async listHttpAPI() {
+    return this.get('/httpapi/list');
+  }
+
+  async addHttpAPI(data) {
+    return this.post('/httpapi/add', { data });
+  }
+
+  async deleteHttpAPI(email) {
+    return this.post('/httpapi/delete', { email });
+  }
+
+  async clearHttpAPI() {
+    return this.post('/httpapi/clear', {});
+  }
+
+  async clearRegisteredHttpAPI() {
+    return this.post('/httpapi/clear-registered', {});
+  }
+
+>>>>>>> d30d9ea71a62414184b1134dad295f267a744b94
   // ===== 号池相关 API =====
 
   // 获取号池列表
@@ -133,6 +183,40 @@ class KiroAPI {
   // 刷新号池
   async refreshPool(poolName) {
     return this.post('/pools/refresh', { poolName });
+  }
+
+  // ===== 代理池相关 API =====
+
+  async listProxyPool() {
+    return this.get('/proxy/list');
+  }
+
+  async batchAddProxy(urls, weight) {
+    return this.post('/proxy/batch-add', { urls, weight });
+  }
+
+  async testProxy(url) {
+    return this.post('/proxy/test', { url });
+  }
+
+  async addProxy(name, url, weight) {
+    return this.post('/proxy/add', { name, url, weight });
+  }
+
+  async updateProxy(id, name, url, weight, enabled) {
+    return this.post('/proxy/update', { id, name, url, weight, enabled });
+  }
+
+  async deleteProxy(id) {
+    return this.post('/proxy/delete', { id });
+  }
+
+  async batchDeleteProxy(ids) {
+    return this.post('/proxy/batch-delete', { ids });
+  }
+
+  async batchSetProxyWeight(ids, weight) {
+    return this.post('/proxy/batch-weight', { ids, weight });
   }
 
   // ===== 网关相关 API =====

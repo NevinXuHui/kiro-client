@@ -136,12 +136,12 @@ func Add(entry PoolEntry) (PoolEntry, error) {
 
 // BatchAddResult 批量添加结果
 type BatchAddResult struct {
-	Success   int      `json:"success"`   // 成功添加数量
-	Failed    int      `json:"failed"`    // 失败数量
-	Skipped   int      `json:"skipped"`   // 跳过数量（重复）
-	Total     int      `json:"total"`     // 总数量
-	Errors    []string `json:"errors"`    // 错误信息列表
-	Added     []string `json:"added"`     // 成功添加的代理地址
+	Success int      `json:"success"` // 成功添加数量
+	Failed  int      `json:"failed"`  // 失败数量
+	Skipped int      `json:"skipped"` // 跳过数量（重复）
+	Total   int      `json:"total"`   // 总数量
+	Errors  []string `json:"errors"`  // 错误信息列表
+	Added   []string `json:"added"`   // 成功添加的代理地址
 }
 
 // BatchAdd 批量新增代理
@@ -277,6 +277,72 @@ func Delete(id string) error {
 		}
 	}
 	return fmt.Errorf("代理不存在")
+}
+
+// DeleteMany 按 id 批量删除，一次落盘。
+func DeleteMany(ids []string) map[string]interface{} {
+	want := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			want[id] = struct{}{}
+		}
+	}
+	poolMu.Lock()
+	defer poolMu.Unlock()
+	loadPoolLocked()
+	kept := poolEntries[:0]
+	deleted := 0
+	for _, e := range poolEntries {
+		if _, ok := want[e.ID]; ok {
+			deleted++
+			continue
+		}
+		kept = append(kept, e)
+	}
+	missing := len(want) - deleted
+	if deleted > 0 {
+		poolEntries = kept
+		if err := savePoolLocked(); err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+	}
+	return map[string]interface{}{"success": true, "deleted": deleted, "missing": missing}
+}
+
+// SetWeightMany 批量改权重，一次落盘。
+func SetWeightMany(ids []string, weight int) map[string]interface{} {
+	if weight < 1 {
+		weight = 1
+	}
+	if weight > 100 {
+		weight = 100
+	}
+	want := make(map[string]struct{}, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id != "" {
+			want[id] = struct{}{}
+		}
+	}
+	poolMu.Lock()
+	defer poolMu.Unlock()
+	loadPoolLocked()
+	updated := 0
+	for i, e := range poolEntries {
+		if _, ok := want[e.ID]; !ok {
+			continue
+		}
+		e.Weight = weight
+		poolEntries[i] = e
+		updated++
+	}
+	if updated > 0 {
+		if err := savePoolLocked(); err != nil {
+			return map[string]interface{}{"error": err.Error()}
+		}
+	}
+	return map[string]interface{}{"success": true, "updated": updated, "weight": weight}
 }
 
 // PickRandom 按权重抽签返回一个启用的代理 URL；池为空或全部禁用返回空串。
