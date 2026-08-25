@@ -1,0 +1,72 @@
+frontend/js/api.js
+  e6c611d58b9d586b 116-120
+cmd/web/main.go
+  e6c611d58b9d586b 36
+frontend/js/adapter.js
+  e6c611d58b9d586b 44-62
+internal/web/server.go
+  e6c611d58b9d586b 160-169,172-173
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "6b88bdf0e4048dfa1dd63871ca8cf416ce1d60a1",
+  "prompts": {
+    "e6c611d58b9d586b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4bb9589b-8b9f-4e64-8afe-67364947b4ea",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 37,
+      "total_deletions": 7,
+      "accepted_lines": 37,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 37,
+    "git_diff_deleted_lines": 7,
+    "ai_additions": 37,
+    "ai_accepted": 37,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 37,
+    "BYRC": 0,
+    "per_file": {
+      "cmd/web/main.go": {
+        "BYMC": [],
+        "BYAC": [
+          "36"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/adapter.js": {
+        "BYMC": [],
+        "BYAC": [
+          "44-62"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/api.js": {
+        "BYMC": [],
+        "BYAC": [
+          "116-120"
+        ],
+        "BYRC": []
+      },
+      "internal/web/server.go": {
+        "BYMC": [],
+        "BYAC": [
+          "160-169",
+          "172-173"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787668773,
+  "requirement_id": ""
+}
