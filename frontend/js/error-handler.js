@@ -111,7 +111,7 @@
     }
   });
 
-  // 拦截 console.error（可选）
+  // 拦截 console.error（仅过滤扩展错误）
   const originalConsoleError = console.error;
   console.error = function(...args) {
     // 检查是否包含扩展相关的错误
@@ -125,6 +125,9 @@
     originalConsoleError.apply(console, args);
   };
 
+  // 确保其他 console 方法正常工作
+  // 不拦截 console.log, console.info, console.warn 等
   console.log('[错误处理器] 全局错误拦截已启用');
   console.log('[错误处理器] 将自动过滤第三方扩展错误');
+  console.log('[错误处理器] console.log/info/warn 正常可用');
 })();

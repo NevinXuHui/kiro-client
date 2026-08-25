@@ -62,6 +62,294 @@ async function addOutlookAccount() {
   }
 }
 
+// ===== 导出账号 =====
+function exportOutlookAccounts(format, filter) {
+  try {
+    var accounts = outlookAllAccounts;
+
+    // 应用过滤器
+    if (filter === 'unregistered') {
+      accounts = accounts.filter(acc => !acc.registered);
+    } else if (filter === 'registered') {
+      accounts = accounts.filter(acc => acc.registered);
+    } else if (filter === 'success') {
+      accounts = accounts.filter(acc => acc.success);
+    }
+
+    if (accounts.length === 0) {
+      showToast('没有符合条件的账号可导出', 'warning');
+      return;
+    }
+
+    var filename = 'kiro-outlook-accounts-' + new Date().toISOString().split('T')[0];
+    var content = '';
+
+    if (format === 'json') {
+      // JSON 格式
+      content = JSON.stringify(accounts, null, 2);
+      filename += '.json';
+      downloadFile(filename, content, 'application/json');
+    } else if (format === 'csv') {
+      // CSV 格式
+      var headers = ['邮箱', '密码', 'ClientID', 'RefreshToken', '已注册', '成功', '添加时间'];
+      var rows = [headers.join(',')];
+
+      accounts.forEach(function(acc) {
+        var row = [
+          csvEscape(acc.email || ''),
+          csvEscape(acc.password || ''),
+          csvEscape(acc.clientId || ''),
+          csvEscape(acc.refreshToken || ''),
+          acc.registered ? '是' : '否',
+          acc.success ? '是' : '否',
+          csvEscape(acc.addedAt || '')
+        ];
+        rows.push(row.join(','));
+      });
+
+      content = rows.join('\n');
+      filename += '.csv';
+      downloadFile(filename, '﻿' + content, 'text/csv'); // 添加 BOM 支持中文
+    } else if (format === 'txt') {
+      // TXT 格式（每行一个账号）
+      var lines = accounts.map(function(acc) {
+        return [acc.email, acc.password, acc.clientId, acc.refreshToken].join('----');
+      });
+      content = lines.join('\n');
+      filename += '.txt';
+      downloadFile(filename, content, 'text/plain');
+    }
+
+    showToast('导出成功：' + accounts.length + ' 个账号', 'success');
+  } catch (e) {
+    showToast('导出失败: ' + e.message, 'error');
+  }
+}
+
+// CSV 字段转义
+function csvEscape(str) {
+  if (str == null) return '';
+  str = String(str);
+  if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+// 下载文件
+function downloadFile(filename, content, mimeType) {
+  var blob = new Blob([content], { type: mimeType });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ===== 导入账号 =====
+function openImportModal() {
+  var modal = document.getElementById('import-modal');
+  if (modal) {
+    modal.classList.add('show');
+    // 重置文件输入
+    var fileInput = document.getElementById('import-file-input');
+    if (fileInput) fileInput.value = '';
+    // 隐藏结果
+    var result = document.getElementById('import-result');
+    if (result) result.style.display = 'none';
+  }
+}
+
+function closeImportModal() {
+  var modal = document.getElementById('import-modal');
+  if (modal) modal.classList.remove('show');
+}
+
+function triggerFileSelect() {
+  var fileInput = document.getElementById('import-file-input');
+  if (fileInput) fileInput.click();
+}
+
+async function handleFileSelect(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+
+  try {
+    var content = await readFileContent(file);
+    await importAccountsFromContent(content, file.name);
+  } catch (e) {
+    showToast('文件读取失败: ' + e.message, 'error');
+  }
+}
+
+function readFileContent(file) {
+  return new Promise(function(resolve, reject) {
+    var reader = new FileReader();
+    reader.onload = function(e) { resolve(e.target.result); };
+    reader.onerror = function(e) { reject(new Error('文件读取失败')); };
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+async function importAccountsFromContent(content, filename) {
+  try {
+    var accounts = [];
+    var errors = [];
+
+    // 检测文件格式
+    var ext = filename.split('.').pop().toLowerCase();
+
+    if (ext === 'json') {
+      // JSON 格式
+      try {
+        var data = JSON.parse(content);
+        if (Array.isArray(data)) {
+          accounts = data;
+        } else {
+          errors.push('JSON 格式错误：需要是数组');
+        }
+      } catch (e) {
+        errors.push('JSON 解析失败：' + e.message);
+      }
+    } else if (ext === 'csv') {
+      // CSV 格式
+      var lines = content.split('\n');
+      for (var i = 1; i < lines.length; i++) { // 跳过标题行
+        var line = lines[i].trim();
+        if (!line) continue;
+
+        var fields = parseCSVLine(line);
+        if (fields.length >= 4) {
+          accounts.push({
+            email: fields[0],
+            password: fields[1],
+            clientId: fields[2],
+            refreshToken: fields[3]
+          });
+        } else {
+          errors.push('第 ' + (i + 1) + ' 行格式错误');
+        }
+      }
+    } else {
+      // TXT 格式（每行一个账号）
+      var lines = content.split('\n');
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line || line.startsWith('#') || line.startsWith('//')) continue;
+
+        var parts = line.split('----');
+        if (parts.length >= 4) {
+          accounts.push({
+            email: parts[0].trim(),
+            password: parts[1].trim(),
+            clientId: parts[2].trim(),
+            refreshToken: parts[3].trim()
+          });
+        } else {
+          errors.push('第 ' + (i + 1) + ' 行格式错误');
+        }
+      }
+    }
+
+    // 验证和导入
+    var validAccounts = [];
+    for (var i = 0; i < accounts.length; i++) {
+      var acc = accounts[i];
+      if (acc.email && acc.email.includes('@') && acc.password && acc.clientId && acc.refreshToken) {
+        validAccounts.push(acc);
+      } else {
+        errors.push('账号 ' + (i + 1) + ' 缺少必需字段');
+      }
+    }
+
+    if (validAccounts.length === 0) {
+      showImportResult(0, 0, errors);
+      return;
+    }
+
+    // 批量导入
+    var data = validAccounts.map(function(acc) {
+      return [acc.email, acc.password, acc.clientId, acc.refreshToken].join('----');
+    }).join('\n');
+
+    var result = await window.go.main.App.AddOutlookAccounts(data);
+
+    if (result.error) {
+      errors.push(result.error);
+    }
+
+    await loadOutlookAccountsList();
+    showImportResult(result.added || 0, result.total || 0, errors);
+
+  } catch (e) {
+    showToast('导入失败: ' + e.message, 'error');
+  }
+}
+
+// 解析 CSV 行（处理引号和逗号）
+function parseCSVLine(line) {
+  var fields = [];
+  var current = '';
+  var inQuotes = false;
+
+  for (var i = 0; i < line.length; i++) {
+    var char = line[i];
+    var next = line[i + 1];
+
+    if (char === '"') {
+      if (inQuotes && next === '"') {
+        current += '"';
+        i++; // 跳过下一个引号
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === ',' && !inQuotes) {
+      fields.push(current.trim());
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+
+  fields.push(current.trim());
+  return fields;
+}
+
+function showImportResult(added, total, errors) {
+  var resultDiv = document.getElementById('import-result');
+  if (!resultDiv) return;
+
+  var html = '<div style="padding:16px">';
+  html += '<h3 style="margin:0 0 12px 0">导入结果</h3>';
+  html += '<div style="margin-bottom:12px">';
+  html += '<div>✅ 成功添加: <strong>' + added + '</strong> 个账号</div>';
+  html += '<div>📊 当前总数: <strong>' + total + '</strong> 个账号</div>';
+  html += '</div>';
+
+  if (errors && errors.length > 0) {
+    html += '<div style="margin-top:12px">';
+    html += '<div style="color:#f56c6c;font-weight:500">⚠️ 错误信息:</div>';
+    html += '<ul style="margin:8px 0;padding-left:20px;max-height:200px;overflow-y:auto">';
+    errors.forEach(function(err) {
+      html += '<li style="color:#f56c6c">' + escapeHtml(err) + '</li>';
+    });
+    html += '</ul>';
+    html += '</div>';
+  }
+
+  html += '</div>';
+  resultDiv.innerHTML = html;
+  resultDiv.style.display = 'block';
+
+  if (added > 0) {
+    showToast('成功导入 ' + added + ' 个账号', 'success');
+  }
+}
+
 // ===== 多账号批量添加（旧版兼容） =====
 async function addOutlookAccounts() {
   var data = (document.getElementById('cfg-outlook-data') && document.getElementById('cfg-outlook-data').value) || '';
