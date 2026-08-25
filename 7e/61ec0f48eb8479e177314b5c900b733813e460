@@ -1,0 +1,54 @@
+frontend/index.html
+  e6c611d58b9d586b 378-397,1060-1129
+frontend/js/accounts.js
+  e6c611d58b9d586b 377-404
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "7e61ec0f48eb8479e177314b5c900b733813e460",
+  "prompts": {
+    "e6c611d58b9d586b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4bb9589b-8b9f-4e64-8afe-67364947b4ea",
+        "model": "claude-sonnet-4-5-20250929"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 118,
+      "total_deletions": 1,
+      "accepted_lines": 118,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 118,
+    "git_diff_deleted_lines": 1,
+    "ai_additions": 118,
+    "ai_accepted": 118,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 118,
+    "BYRC": 0,
+    "per_file": {
+      "frontend/index.html": {
+        "BYMC": [],
+        "BYAC": [
+          "378-397",
+          "1060-1129"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/accounts.js": {
+        "BYMC": [],
+        "BYAC": [
+          "377-404"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787664917,
+  "requirement_id": ""
+}
