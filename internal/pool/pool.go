@@ -36,7 +36,8 @@ type Account struct {
 	CreditLimit  int    `json:"creditLimit"`
 	CreditUsed   int    `json:"creditUsed"`
 	CreditResetAt string `json:"creditResetAt,omitempty"` // 额度重置时间（9router nextDateReset）
-	Time         string `json:"time"`
+	ProfileArn    string `json:"profileArn,omitempty"`    // CodeWhisperer profile ARN（IdC 用量接口需要）
+	Time          string `json:"time"`
 
 	// 运行时字段（不持久化，从 API 实时查询）
 	HealthStatus    string                 `json:"healthStatus,omitempty"`    // healthy / unhealthy / unknown

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"time"
 
@@ -137,38 +138,73 @@ func classifyHealthError(err error) (healthStatus, healthCode string) {
 }
 
 // GetUsage 查询账号额度（参考 9router kiro.js 实现）
+func usageProfileArn(arn string) string {
+	arn = strings.TrimSpace(arn)
+	if arn == "" || strings.Contains(arn, "AAAACCCCXXXX") {
+		return ""
+	}
+	return arn
+}
+
+func usageLimitsURL(region, profileArn string) string {
+	u := fmt.Sprintf("%s/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST", qUsageEndpoint(region))
+	if arn := usageProfileArn(profileArn); arn != "" {
+		u += "&profileArn=" + url.QueryEscape(arn)
+	}
+	return u
+}
+
 func (c *KiroClient) GetUsage(account *Account, accessToken string) (map[string]interface{}, error) {
-	// 尝试多个已知的 Kiro usage endpoints
-	attempts := []struct {
+	arn := ""
+	if account != nil {
+		arn = usageProfileArn(account.ProfileArn)
+	}
+	makeAttempts := func(a string) []struct {
 		name string
 		run  func() (*fhttp.Response, error)
-	}{
-		{
-			name: "codewhisperer-post",
-			run: func() (*fhttp.Response, error) {
-				body, _ := json.Marshal(map[string]interface{}{
-					"origin":       "AI_EDITOR",
-					"resourceType": "AGENTIC_REQUEST",
-				})
-				req, _ := fhttp.NewRequest("POST", cwUsageEndpoint(account.Region), bytes.NewReader(body))
-				req.Header.Set("Authorization", "Bearer "+accessToken)
-				req.Header.Set("Content-Type", "application/x-amz-json-1.0")
-				req.Header.Set("x-amz-target", "AmazonCodeWhispererService.GetUsageLimits")
-				req.Header.Set("Accept", "application/json")
-				return c.httpClient.Do(req)
+	} {
+		return []struct {
+			name string
+			run  func() (*fhttp.Response, error)
+		}{
+			{
+				name: "codewhisperer-post",
+				run: func() (*fhttp.Response, error) {
+					payload := map[string]interface{}{
+						"origin":       "AI_EDITOR",
+						"resourceType": "AGENTIC_REQUEST",
+					}
+					if a != "" {
+						payload["profileArn"] = a
+					}
+					body, _ := json.Marshal(payload)
+					req, _ := fhttp.NewRequest("POST", cwUsageEndpoint(account.Region), bytes.NewReader(body))
+					req.Header.Set("Authorization", "Bearer "+accessToken)
+					req.Header.Set("Content-Type", "application/x-amz-json-1.0")
+					req.Header.Set("x-amz-target", "AmazonCodeWhispererService.GetUsageLimits")
+					req.Header.Set("Accept", "application/json")
+					return c.httpClient.Do(req)
+				},
 			},
-		},
-		{
-			name: "q-get",
-			run: func() (*fhttp.Response, error) {
-				url := fmt.Sprintf("%s/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST", qUsageEndpoint(account.Region))
-				req, _ := fhttp.NewRequest("GET", url, nil)
-				req.Header.Set("Authorization", "Bearer "+accessToken)
-				req.Header.Set("Accept", "application/json")
-				return c.httpClient.Do(req)
+			{
+				name: "q-get",
+				run: func() (*fhttp.Response, error) {
+					req, _ := fhttp.NewRequest("GET", usageLimitsURL(account.Region, a), nil)
+					req.Header.Set("Authorization", "Bearer "+accessToken)
+					req.Header.Set("Accept", "application/json")
+					return c.httpClient.Do(req)
+				},
 			},
-		},
+		}
 	}
+	var attempts []struct {
+		name string
+		run  func() (*fhttp.Response, error)
+	}
+	if arn != "" {
+		attempts = append(attempts, makeAttempts(arn)...)
+	}
+	attempts = append(attempts, makeAttempts("")...)
 
 	var lastErr error
 	for _, attempt := range attempts {
@@ -309,8 +345,16 @@ func getFloat(m map[string]interface{}, key string) float64 {
 }
 
 // GetAvailableModels 获取可用模型列表
-func (c *KiroClient) GetAvailableModels(account *Account) []string {
-	return []string{
+func availableModelsURL(region, profileArn string) string {
+	u := fmt.Sprintf("%s/ListAvailableModels?origin=AI_EDITOR", qUsageEndpoint(region))
+	if arn := usageProfileArn(profileArn); arn != "" {
+		u += "&profileArn=" + url.QueryEscape(arn)
+	}
+	return u
+}
+
+func (c *KiroClient) GetAvailableModels(account *Account, accessToken string) []string {
+	fallback := []string{
 		"claude-opus-4.8",
 		"claude-opus-4.7",
 		"claude-opus-4.5",
@@ -322,6 +366,58 @@ func (c *KiroClient) GetAvailableModels(account *Account) []string {
 		"glm-5",
 		"MiniMax-M2.5",
 	}
+	if accessToken == "" {
+		return fallback
+	}
+	arn := ""
+	if account != nil {
+		arn = usageProfileArn(account.ProfileArn)
+	}
+	urls := make([]string, 0, 2)
+	if arn != "" {
+		urls = append(urls, availableModelsURL(account.Region, arn))
+	}
+	urls = append(urls, availableModelsURL(account.Region, ""))
+	for _, u := range urls {
+		req, err := fhttp.NewRequest("GET", u, nil)
+		if err != nil {
+			continue
+		}
+		req.Header.Set("Authorization", "Bearer "+accessToken)
+		req.Header.Set("Accept", "application/json")
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			continue
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			continue
+		}
+		var data map[string]interface{}
+		if json.Unmarshal(body, &data) != nil {
+			continue
+		}
+		raw, _ := data["models"].([]interface{})
+		out := make([]string, 0, len(raw))
+		for _, item := range raw {
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			id, _ := m["modelId"].(string)
+			if id == "" {
+				id, _ = m["modelName"].(string)
+			}
+			if id != "" {
+				out = append(out, id)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+	}
+	return fallback
 }
 
 // UpdateAccountInfo 更新账号运行时信息（健康状态、额度、模型）
@@ -388,7 +484,7 @@ func (c *KiroClient) UpdateAccountInfo(account *Account) error {
 	}
 
 	// 4. 获取可用模型
-	account.AvailableModels = c.GetAvailableModels(account)
+	account.AvailableModels = c.GetAvailableModels(account, accessToken)
 
 	account.LastUpdatedAt = now
 	return nil

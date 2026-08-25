@@ -13,6 +13,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -195,9 +196,19 @@ func kiroFetchCatalogRaw(credentials *KiroCredential, proxy string) ([]map[strin
 		profileArn = credentials.ProviderSpecificData.ProfileArn
 	}
 	region := kiroRegionFromProfileArn(profileArn)
+	arn := EffectiveProfileArn(profileArn)
+	if arn == "" && credentials != nil && credentials.AccessToken != "" {
+		regionForResolve := region
+		if regionForResolve == "" {
+			regionForResolve = kiroDefaultRegion
+		}
+		if resolved, err := ListAvailableProfiles(credentials.AccessToken, regionForResolve, proxy); err == nil {
+			arn = EffectiveProfileArn(resolved)
+		}
+	}
 	params := "origin=AI_EDITOR"
-	if profileArn != "" {
-		params += "&profileArn=" + profileArn
+	if arn != "" {
+		params += "&profileArn=" + url.QueryEscape(arn)
 	}
 	url := fmt.Sprintf("https://q.%s.amazonaws.com/ListAvailableModels?%s", region, params)
 
@@ -209,35 +220,48 @@ func kiroFetchCatalogRaw(credentials *KiroCredential, proxy string) ([]map[strin
 	headers["Authorization"] = "Bearer " + accessToken
 
 	client := newModelsClient(proxy)
-	req, err := fhttp.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	for k, v := range headers {
-		req.Header.Set(k, v)
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	body := make([]byte, 0)
-	if resp.Body != nil {
-		buf := make([]byte, 4096)
-		for {
-			n, err := resp.Body.Read(buf)
-			body = append(body, buf[:n]...)
-			if err != nil {
-				break
+	fetch := func(u string) ([]byte, int, error) {
+		req, err := fhttp.NewRequest("GET", u, nil)
+		if err != nil {
+			return nil, 0, err
+		}
+		for k, v := range headers {
+			req.Header.Set(k, v)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, 0, err
+		}
+		defer resp.Body.Close()
+		body := make([]byte, 0)
+		if resp.Body != nil {
+			buf := make([]byte, 4096)
+			for {
+				n, err := resp.Body.Read(buf)
+				body = append(body, buf[:n]...)
+				if err != nil {
+					break
+				}
 			}
 		}
+		return body, resp.StatusCode, nil
 	}
-	if resp.StatusCode != 200 {
+	body, status, err := fetch(url)
+	if err != nil {
+		return nil, err
+	}
+	if status != 200 && arn != "" {
+		body, status, err = fetch(AvailableModelsURL(region, ""))
+		if err != nil {
+			return nil, err
+		}
+	}
+	if status != 200 {
 		text := strings.TrimSpace(string(body))
 		if text == "" {
-			text = resp.Status
+			text = fmt.Sprintf("HTTP %d", status)
 		}
-		return nil, fmt.Errorf("Kiro ListAvailableModels %d: %s", resp.StatusCode, text)
+		return nil, fmt.Errorf("Kiro ListAvailableModels %d: %s", status, text)
 	}
 	var data map[string]interface{}
 	if json.Unmarshal(body, &data) != nil {

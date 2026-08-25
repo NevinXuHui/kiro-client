@@ -125,7 +125,20 @@ func (p *AccountPool) RefreshQuota() {
 		}
 
 		proxy := acc.Proxy
-		used, limit, resetAt, err := quotaFunc(token, acc.Region, proxy)
+		region := acc.Region
+		if region == "" {
+			region = "us-east-1"
+		}
+		arn := EffectiveProfileArn(acc.ProfileArn)
+		if arn == "" {
+			if resolved, err := ListAvailableProfiles(token, region, proxy); err == nil {
+				arn = EffectiveProfileArn(resolved)
+				if arn != "" {
+					acc.ProfileArn = arn
+				}
+			}
+		}
+		used, limit, resetAt, err := quotaFunc(token, region, proxy, arn)
 		if err != nil {
 			continue
 		}

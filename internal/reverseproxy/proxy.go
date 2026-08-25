@@ -24,8 +24,8 @@ type Config struct {
 }
 
 // QuotaRefreshFunc 刷新账号额度的回调（9router getKiroUsage 同款语义）。
-// 参数：accessToken, region, proxy → (creditUsed, creditLimit, resetAt, error)
-type QuotaRefreshFunc func(accessToken, region, proxy string) (used, limit float64, resetAt string, err error)
+// 参数：accessToken, region, proxy, profileArn → (creditUsed, creditLimit, resetAt, error)
+type QuotaRefreshFunc func(accessToken, region, proxy, profileArn string) (used, limit float64, resetAt string, err error)
 
 // egressProxy 解析账号的出口代理：账号自带代理优先，否则用全局设置。
 // kiro.dev 按出口 IP 限流，直连住宅 IP 很快就会 429，因此全局代理必须生效。

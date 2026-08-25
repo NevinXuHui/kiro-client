@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"strings"
 	"time"
 
@@ -58,16 +59,16 @@ func (r *Registrar) VerifyAlive(awsToken map[string]interface{}) map[string]inte
 	expiresIn, _ := tok["expiresIn"].(float64)
 	log.Printf("Token 刷新成功, expiresIn=%ds", int(expiresIn))
 
-	usageURL := "https://q.us-east-1.amazonaws.com/getUsageLimits?origin=AI_EDITOR&resourceType=AGENTIC_REQUEST&isEmailRequired=true"
-	usageRes := queryGetEndpointWithRetry(client, access, usageURL)
-	if usageRes.statusCode == 403 {
-		return map[string]interface{}{"alive": false, "error": "Q 端点 403 [usage]"}
-	}
+	arn := resolveVerifyProfileArn(client, access)
+	usageRes := queryQEndpoint(client, access, "getUsageLimits", "origin=AI_EDITOR&resourceType=AGENTIC_REQUEST&isEmailRequired=true", arn)
 	if !usageRes.ok {
 		log.Printf("[验活] getUsageLimits 不可达 (status=%d)，跳过用量查询", usageRes.statusCode)
 	}
 
-	modelRes := queryGetEndpointWithRetry(client, access, "https://q.us-east-1.amazonaws.com/ListAvailableModels?origin=AI_EDITOR")
+	modelRes := queryQEndpoint(client, access, "ListAvailableModels", "origin=AI_EDITOR", arn)
+	if usageRes.statusCode == 403 {
+		return map[string]interface{}{"alive": false, "error": "Q 端点 403 [usage]"}
+	}
 	if modelRes.statusCode == 403 {
 		return map[string]interface{}{"alive": false, "error": "Q 端点 403 [models]"}
 	}
@@ -120,6 +121,76 @@ func endpointLabel(url string) string {
 	default:
 		return "endpoint"
 	}
+}
+
+
+func effectiveVerifyArn(arn string) string {
+	arn = strings.TrimSpace(arn)
+	if arn == "" || strings.Contains(arn, "AAAACCCCXXXX") {
+		return ""
+	}
+	return arn
+}
+
+func qEndpointURL(path, query, profileArn string) string {
+	u := "https://q.us-east-1.amazonaws.com/" + path + "?" + query
+	if arn := effectiveVerifyArn(profileArn); arn != "" {
+		u += "&profileArn=" + url.QueryEscape(arn)
+	}
+	return u
+}
+
+func resolveVerifyProfileArn(client interface {
+	Do(req *fhttp.Request) (*fhttp.Response, error)
+}, access string) string {
+	body, _ := json.Marshal(map[string]interface{}{"maxResults": 10})
+	req, err := fhttp.NewRequest("POST", "https://codewhisperer.us-east-1.amazonaws.com", bytes.NewReader(body))
+	if err != nil {
+		return ""
+	}
+	req.Header.Set("Content-Type", "application/x-amz-json-1.0")
+	req.Header.Set("x-amz-target", "AmazonCodeWhispererService.ListAvailableProfiles")
+	req.Header.Set("Authorization", "Bearer "+access)
+	req.Header.Set("Accept", "application/json")
+	resp, err := client.Do(req)
+	if err != nil {
+		return ""
+	}
+	respBody, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		return ""
+	}
+	var data map[string]interface{}
+	if json.Unmarshal(respBody, &data) != nil {
+		return ""
+	}
+	raw, _ := data["profiles"].([]interface{})
+	for _, item := range raw {
+		p, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		for _, key := range []string{"arn", "profileArn"} {
+			if s, _ := p[key].(string); effectiveVerifyArn(s) != "" {
+				return strings.TrimSpace(s)
+			}
+		}
+	}
+	return ""
+}
+
+func queryQEndpoint(client interface {
+	Do(req *fhttp.Request) (*fhttp.Response, error)
+}, access, path, query, profileArn string) endpointResult {
+	res := queryGetEndpointWithRetry(client, access, qEndpointURL(path, query, profileArn))
+	if res.ok {
+		return res
+	}
+	if profileArn != "" {
+		return queryGetEndpointWithRetry(client, access, qEndpointURL(path, query, ""))
+	}
+	return res
 }
 
 // queryGetEndpointWithRetry 带重试的 GET 端点查询。
