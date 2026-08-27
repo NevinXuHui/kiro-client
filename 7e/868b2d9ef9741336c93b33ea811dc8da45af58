@@ -1,0 +1,47 @@
+internal/data/results.go
+  40c1de226dfd26da 9,13-14,56-59,89-92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "7e868b2d9ef9741336c93b33ea811dc8da45af58",
+  "prompts": {
+    "40c1de226dfd26da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "150d9e8a-ed1a-4378-aced-d9fc6c474e40",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 0,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 13,
+    "git_diff_deleted_lines": 0,
+    "ai_additions": 11,
+    "ai_accepted": 11,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 11,
+    "BYRC": 0,
+    "per_file": {
+      "internal/data/results.go": {
+        "BYMC": [],
+        "BYAC": [
+          "9",
+          "13-14",
+          "56-59",
+          "89-92"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787840931,
+  "requirement_id": ""
+}
