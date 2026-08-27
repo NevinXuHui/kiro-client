@@ -157,9 +157,17 @@ func newAllocator(parent context.Context, proxy string, visible bool) (context.C
 		chromedp.Flag("no-sandbox", true),
 		chromedp.Flag("disable-dev-shm-usage", true),
 		chromedp.Flag("disable-gpu", true),
-		// 临时用户数据目录隔离，避免污染用户真实浏览器配置。
-		chromedp.UserDataDir(""),
 	}
+
+	// 临时用户数据目录隔离：每个会话独立目录，避免 SingletonLock 冲突
+	tmpDir, err := os.MkdirTemp("", "kiro-chrome-*")
+	if err == nil {
+		opts = append(opts, chromedp.UserDataDir(tmpDir))
+	} else {
+		// 回退：空目录（会复用系统默认，但可能冲突）
+		opts = append(opts, chromedp.UserDataDir(""))
+	}
+
 	if !visible {
 		opts = append(opts, chromedp.Headless)
 	}
