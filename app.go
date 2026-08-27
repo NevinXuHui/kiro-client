@@ -18,6 +18,7 @@ import (
 
 	"github.com/energye/systray"
 
+	"reg_go/internal/browser"
 	"reg_go/internal/core"
 	"reg_go/internal/data"
 	"reg_go/internal/email"
@@ -253,8 +254,12 @@ func (a *App) StartTask(raw string) map[string]interface{} {
 	return task.StartTask(req)
 }
 
-func (a *App) StopTask() map[string]interface{}              { return task.StopTask(false) }
-func (a *App) ResetFingerprintCache() map[string]interface{} { return map[string]interface{}{} }
+func (a *App) StopTask() map[string]interface{} { return task.StopTask(false) }
+
+func (a *App) ResetFingerprintCache() map[string]interface{} {
+	browser.ResetIdentityCache()
+	return map[string]interface{}{"ok": true}
+}
 
 // ===== Manual Register（手动注册：设备授权 + 可见浏览器）=====
 

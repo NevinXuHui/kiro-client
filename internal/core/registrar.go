@@ -79,9 +79,8 @@ type Registrar struct {
 
 // NewRegistrar 创建注册器
 func NewRegistrar(cfg *Config) *Registrar {
-	// 按代理绑定稳定指纹：同一出口 IP 下短时间内重复使用同一硬件身份，
-	// 只有 lsubid 前缀 / webpackHash 等真实浏览器会话间也会变的字段每次刷新。
-	identity := browser.IdentityForProxy(cfg.Proxy)
+	// 每次注册生成全新硬件指纹，避免同一出口下批量号共用同一设备画像。
+	identity := browser.RandomIdentity()
 	log.Printf("[指纹] Chrome: %s | GPU: %s | 内存: %dGB | 核心: %d | 分辨率: %dx%d (%d-bit)",
 		identity.ChromeVer, identity.GPUModel, identity.DeviceMemory, identity.HardwareConcurrency,
 		identity.Screen.Width, identity.Screen.Height, identity.Screen.ColorDepth)
