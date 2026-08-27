@@ -6,7 +6,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
+)
+
+var (
+	accountsFileMu sync.Mutex
 )
 
 // SaveKiroSuccess 以明文 JSON 数组形式把成功注册的账号写入 outDir/accounts.json。
@@ -48,6 +53,10 @@ func SaveKiroSuccess(result map[string]interface{}, outDir string) error {
 	}
 	path := filepath.Join(outDir, "accounts.json")
 
+	// 文件锁保护并发读写
+	accountsFileMu.Lock()
+	defer accountsFileMu.Unlock()
+
 	existing, err := loadJSONArray(path)
 	if err != nil {
 		return fmt.Errorf("读取 accounts.json 失败: %w", err)
@@ -77,6 +86,10 @@ func LoadAccounts(outDir string) ([]map[string]interface{}, error) {
 // DeleteAccount 从 outDir/accounts.json 中移除指定邮箱的账号；返回是否实际删除。
 func DeleteAccount(outDir, email string) (bool, error) {
 	path := filepath.Join(outDir, "accounts.json")
+
+	accountsFileMu.Lock()
+	defer accountsFileMu.Unlock()
+
 	existing, err := loadJSONArray(path)
 	if err != nil || len(existing) == 0 {
 		return false, err
