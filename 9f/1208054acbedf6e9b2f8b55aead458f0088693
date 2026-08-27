@@ -1,0 +1,44 @@
+internal/waf/browser.go
+  40c1de226dfd26da 161-170
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "9f1208054acbedf6e9b2f8b55aead458f0088693",
+  "prompts": {
+    "40c1de226dfd26da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "150d9e8a-ed1a-4378-aced-d9fc6c474e40",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 2,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 10,
+    "git_diff_deleted_lines": 2,
+    "ai_additions": 10,
+    "ai_accepted": 10,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 10,
+    "BYRC": 0,
+    "per_file": {
+      "internal/waf/browser.go": {
+        "BYMC": [],
+        "BYAC": [
+          "161-170"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787843407,
+  "requirement_id": ""
+}
