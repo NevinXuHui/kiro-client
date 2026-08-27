@@ -29,6 +29,9 @@ type StartTaskRequest struct {
 	CloudMailDomains    []string                           `json:"cloudmailDomains"`
 	CloudMailConfigs    map[string][]email.CloudMailConfig `json:"cloudmailConfigs"`
 	CloudMailRandomMode bool                               `json:"cloudmailRandomMode"`
+
+	SaveWithoutVerify bool `json:"saveWithoutVerify"` // 注册完成即保存（不等待验活）
+	SaveLoginPassword bool `json:"saveLoginPassword"` // 导出时包含登陆密码
 }
 
 // StartTask 公开方法（包装器）
@@ -613,11 +616,26 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 				email.UpdateHttpAPIAccountStatus(currentEmail, true, success)
 			}
 		}
+
+		// 保存逻辑：根据开关决定是否需要验活成功
+		shouldSave := false
 		if success {
+			shouldSave = true
+		} else if req.SaveWithoutVerify {
+			// 开启「注册完成即保存」：passwordSet=true 即可保存（不管验活结果）
+			passwordSet, _ := result["passwordSet"].(bool)
+			shouldSave = passwordSet
+		}
+
+		if shouldSave {
+			// 根据「保存/导出密码」开关决定是否写入 password 字段
+			if !req.SaveLoginPassword {
+				delete(result, "password")
+			}
 			if err := data.SaveKiroSuccess(result, outDir); err != nil {
 				log.Printf("[Kiro] 保存结果失败: %v", err)
 			}
-			// 自动入库：将成功注册的账号添加到默认号池
+			// 自动入库：将账号添加到默认号池
 			autoAddToPool(result)
 		}
 	}
@@ -778,6 +796,7 @@ func autoAddToPool(result map[string]interface{}) {
 		Region:       "us-east-1",
 		Time:         time.Now().Format("2006-01-02 15:04:05"),
 	}
+	// 仅在「保存/导出密码」开关开启时存储密码
 	if pw, _ := result["password"].(string); pw != "" {
 		acc.Password = pw
 	}

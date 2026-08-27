@@ -291,7 +291,9 @@ function getFormConfig() {
     count: parseInt(document.getElementById('cfg-count').value) || 1,
     concurrency: parseInt(document.getElementById('cfg-concurrency').value) || 1,
     delay: parseInt(document.getElementById('cfg-delay').value) || 3,
-    emailProvider: selectedEmailProvider || 'outlook'
+    emailProvider: selectedEmailProvider || 'outlook',
+    saveWithoutVerify: document.getElementById('cfg-save-without-verify')?.checked !== false,
+    saveLoginPassword: document.getElementById('cfg-save-login-password')?.checked !== false
   };
 
   // 如果选择了 Cloud-Mail，添加域名信息和配置
@@ -337,7 +339,7 @@ function saveConfig() {
 
 
 // 自动保存
-['cfg-count', 'cfg-concurrency', 'cfg-delay'].forEach(function(id) {
+['cfg-count', 'cfg-concurrency', 'cfg-delay', 'cfg-save-without-verify', 'cfg-save-login-password'].forEach(function(id) {
   var el = document.getElementById(id);
   if (el) {
     el.addEventListener('change', saveConfig);
@@ -398,6 +400,12 @@ async function loadConfig() {
       document.getElementById('cfg-count').value = cfg.count || 1;
       document.getElementById('cfg-concurrency').value = cfg.concurrency || 1;
       document.getElementById('cfg-delay').value = cfg.delay || 3;
+      if (cfg.saveWithoutVerify !== undefined) {
+        document.getElementById('cfg-save-without-verify').checked = cfg.saveWithoutVerify;
+      }
+      if (cfg.saveLoginPassword !== undefined) {
+        document.getElementById('cfg-save-login-password').checked = cfg.saveLoginPassword;
+      }
     }
   } catch(e) {
     console.error('[启动] 加载配置失败:', e);

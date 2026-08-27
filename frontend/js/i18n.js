@@ -92,7 +92,9 @@
         startBtn: '开始注册', stopBtn: '停止',
         realtimeLog: '实时日志',
         manualTitle: '手动注册（浏览器）', manualDesc: '弹出真实浏览器窗口，你在浏览器里手动完成 AWS Builder ID 注册 + 授权（真人操作可绕过 TES 风控与域名拉黑）。程序自动轮询令牌，注册成功后自动入库号池。',
-        manualSteps: '步骤：', manualStart: '开始手动注册'
+        manualSteps: '步骤：', manualStart: '开始手动注册',
+        saveWithoutVerify: '注册完成即保存', saveWithoutVerifyHint: '关闭后仅保存验活成功的账号',
+        saveLoginPassword: '保存/导出密码', saveLoginPasswordHint: '关闭后账号导出不含登陆密码'
       },
       accounts: {
         cloudmailTitle: 'Cloud-Mail 自部署邮箱', addConfig: '添加新配置',

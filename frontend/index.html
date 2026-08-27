@@ -272,6 +272,22 @@
                       <input class="frm-inp" id="cfg-delay" value="3" type="number" min="0" step="0.5">
                     </div>
                   </div>
+                  <div class="frm-row" style="margin-top:14px">
+                    <div class="frm" style="margin-bottom:0">
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="cfg-save-without-verify" checked style="width:16px;height:16px;accent-color:var(--blue);">
+                        <span class="frm-lbl" style="margin:0;cursor:pointer;" data-i18n="register.saveWithoutVerify">注册完成即保存</span>
+                      </label>
+                      <div class="frm-hint" data-i18n="register.saveWithoutVerifyHint">关闭后仅保存验活成功的账号</div>
+                    </div>
+                    <div class="frm" style="margin-bottom:0">
+                      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;">
+                        <input type="checkbox" id="cfg-save-login-password" checked style="width:16px;height:16px;accent-color:var(--blue);">
+                        <span class="frm-lbl" style="margin:0;cursor:pointer;" data-i18n="register.saveLoginPassword">保存/导出密码</span>
+                      </label>
+                      <div class="frm-hint" data-i18n="register.saveLoginPasswordHint">关闭后账号导出不含登陆密码</div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
