@@ -1,0 +1,86 @@
+frontend/index.html
+  40c1de226dfd26da 275-290
+frontend/js/app.js
+  40c1de226dfd26da 294-296,342,403-408
+internal/task/coordinator.go
+  40c1de226dfd26da 32-34,619-621,623-634,638,799
+internal/task/coordinator_test.go
+  40c1de226dfd26da 1-74
+frontend/js/i18n.js
+  40c1de226dfd26da 95-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "d66931c3bb5d3cd922915ba6ca506449684b7d0b",
+  "prompts": {
+    "40c1de226dfd26da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "150d9e8a-ed1a-4378-aced-d9fc6c474e40",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 123,
+      "total_deletions": 4,
+      "accepted_lines": 123,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 123,
+    "git_diff_deleted_lines": 4,
+    "ai_additions": 123,
+    "ai_accepted": 123,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 123,
+    "BYRC": 0,
+    "per_file": {
+      "frontend/index.html": {
+        "BYMC": [],
+        "BYAC": [
+          "275-290"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/app.js": {
+        "BYMC": [],
+        "BYAC": [
+          "294-296",
+          "342",
+          "403-408"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/i18n.js": {
+        "BYMC": [],
+        "BYAC": [
+          "95-97"
+        ],
+        "BYRC": []
+      },
+      "internal/task/coordinator.go": {
+        "BYMC": [],
+        "BYAC": [
+          "32-34",
+          "619-621",
+          "623-634",
+          "638",
+          "799"
+        ],
+        "BYRC": []
+      },
+      "internal/task/coordinator_test.go": {
+        "BYMC": [],
+        "BYAC": [
+          "1-74"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787837128,
+  "requirement_id": ""
+}
