@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -25,6 +26,9 @@ type Server struct {
 	proxyServer *reverseproxy.ProxyServer
 	proxyMu     sync.Mutex
 	poolMu      sync.Mutex
+	gwPort      int
+	manualMu    sync.Mutex
+	manualRun   bool
 
 	// WebSocket 连接池
 	wsClients   map[*websocket.Conn]bool
@@ -38,6 +42,7 @@ type Server struct {
 // NewServer 创建新的 Web 服务器
 func NewServer() *Server {
 	s := &Server{
+		gwPort:      20130,
 		wsClients:   make(map[*websocket.Conn]bool),
 		wsBroadcast: make(chan []byte, 256),
 		upgrader: websocket.Upgrader{
@@ -880,6 +885,43 @@ func (s *Server) HandleHttpAPIClearRegistered(w http.ResponseWriter, r *http.Req
 	s.respondJSON(w, email.ClearRegisteredHttpAPIAccounts())
 }
 
+// HandleCloudMailList 列出 Cloud-Mail 配置
+func (s *Server) HandleCloudMailList(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	s.respondJSON(w, email.GetCloudMailConfigs())
+}
+
+// HandleCloudMailSave 保存 Cloud-Mail 配置列表
+func (s *Server) HandleCloudMailSave(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	raw, err := readJSONBody(r)
+	if err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	s.respondJSON(w, email.SaveCloudMailConfigs(string(raw)))
+}
+
+// HandleCloudMailTest 测试 Cloud-Mail 连接
+func (s *Server) HandleCloudMailTest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	raw, err := readJSONBody(r)
+	if err != nil {
+		s.respondError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+	s.respondJSON(w, email.TestCloudMailConnection(string(raw)))
+}
+
 // HandleGatewayStart 启动网关
 func (s *Server) HandleGatewayStart(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -899,22 +941,28 @@ func (s *Server) HandleGatewayStart(w http.ResponseWriter, r *http.Request) {
 	s.proxyMu.Lock()
 	defer s.proxyMu.Unlock()
 
-	if s.proxyServer != nil {
-		s.respondError(w, "Gateway already running", http.StatusBadRequest)
+	if req.Port > 0 {
+		s.gwPort = req.Port
+	}
+	s.ensureProxyServer()
+	if s.proxyServer.IsRunning() {
+		s.respondJSON(w, map[string]interface{}{"success": true, "port": s.proxyServer.Port})
 		return
 	}
-
-	// TODO: 创建正确的配置
-	config := reverseproxy.Config{
-		Port: req.Port,
+	if req.Port > 0 {
+		s.proxyServer.Port = req.Port
 	}
-	proxyServer := reverseproxy.NewProxyServer(config, "")
-	if err := proxyServer.Start(); err != nil {
+	s.proxyServer.Proxy = storage.GetProxy()
+	s.proxyServer.APIKey = storage.GetGatewayAPIKey()
+	if err := s.syncGatewayAccounts(); err != nil {
+		s.respondJSON(w, map[string]interface{}{"success": false, "error": "同步号池失败: " + err.Error()})
+		return
+	}
+	_ = s.proxyServer.ReloadAccounts()
+	if err := s.proxyServer.Start(); err != nil {
 		s.respondError(w, fmt.Sprintf("Failed to start gateway: %v", err), http.StatusInternalServerError)
 		return
 	}
-
-	s.proxyServer = proxyServer
 
 	result := map[string]interface{}{
 		"success": true,
@@ -961,11 +1009,14 @@ func (s *Server) HandleGatewayStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.proxyMu.Lock()
-	running := s.proxyServer != nil
+	s.ensureProxyServer()
+	gp := s.proxyServer
 	s.proxyMu.Unlock()
-
 	result := map[string]interface{}{
-		"running": running,
+		"running": gp.IsRunning(),
+		"port":    gp.Port,
+		"apiKey":  gp.APIKey,
+		"success": true,
 	}
 
 	s.respondJSON(w, result)
@@ -1006,6 +1057,11 @@ func (s *Server) HandleProxyBatchWeight(w http.ResponseWriter, r *http.Request) 
 	result := proxy.SetWeightMany(req.IDs, req.Weight)
 	s.respondJSON(w, result)
 	s.broadcastEvent("proxy_batch_weight", result)
+}
+
+func readJSONBody(r *http.Request) ([]byte, error) {
+	defer r.Body.Close()
+	return io.ReadAll(r.Body)
 }
 
 // respondJSON 返回 JSON 响应

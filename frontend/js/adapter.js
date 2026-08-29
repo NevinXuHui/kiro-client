@@ -111,13 +111,37 @@ window.go = {
       },
 
       GetManualRegisterStatus: async function() {
-        // Web 版本暂时返回默认状态
-        return { running: false };
+        try { return await window.kiroAPI.getManualRegisterStatus(); }
+        catch (err) { return { running: false }; }
+      },
+
+      StartManualRegister: async function() {
+        try { return await window.kiroAPI.startManualRegister(); }
+        catch (err) { return { error: err.message }; }
       },
 
       StopManualRegister: async function() {
-        // Web 版本暂不支持
         return { success: true };
+      },
+
+      OpenURL: async function(url) {
+        if (url) window.open(url, '_blank');
+        return { ok: true };
+      },
+
+      LoadOutputAccounts: async function() {
+        try { return await window.kiroAPI.loadOutputAccounts(); }
+        catch (err) { return { success: false, error: err.message, accounts: [] }; }
+      },
+
+      GetSubscriptionPlans: async function(email) {
+        try { return await window.kiroAPI.getSubscriptionPlans(email); }
+        catch (err) { return { success: false, error: err.message }; }
+      },
+
+      GetSubscriptionLink: async function(email, planType) {
+        try { return await window.kiroAPI.getSubscriptionLink(email, planType); }
+        catch (err) { return { success: false, error: err.message }; }
       },
 
       // 号池相关
@@ -232,7 +256,8 @@ window.go = {
       // 网关相关
       ProxyStart: async function() {
         try {
-          return await window.kiroAPI.startGateway(8081);
+          var port = parseInt((document.getElementById('gw-port') || {}).value, 10) || 20130;
+          return await window.kiroAPI.startGateway(port);
         } catch (err) {
           console.error('ProxyStart error:', err);
           return { error: err.message };
@@ -258,102 +283,114 @@ window.go = {
       },
 
       ProxyConfig: async function(config) {
-        try {
-          // Web 版本暂时不支持动态配置
-          return { success: true };
-        } catch (err) {
-          console.error('ProxyConfig error:', err);
-          return { error: err.message };
-        }
+        try { return await window.kiroAPI.gatewayConfig(config || {}); }
+        catch (err) { return { error: err.message }; }
       },
 
       // 目录和配置相关 (Web 版本使用默认值)
       GetDataDir: async function() {
-        return './data';
+        var r = await window.kiroAPI.getDataDir();
+        return (r && r.path) || '';
       },
 
       SetDataDir: async function(path) {
-        return { success: true, message: 'Web version uses default data directory' };
+        return window.kiroAPI.setDataDir(path);
       },
 
       ResetDataDir: async function() {
-        return { success: true };
+        return window.kiroAPI.resetDataDir();
       },
 
       GetResultOutputDir: async function() {
-        return './results';
+        var r = await window.kiroAPI.getOutputDir();
+        return (r && r.path) || '';
       },
 
       SetResultOutputDir: async function(path) {
-        return { success: true, message: 'Web version uses default output directory' };
+        return window.kiroAPI.setOutputDir(path);
       },
 
       ResetResultOutputDir: async function() {
-        return { success: true };
+        return window.kiroAPI.resetOutputDir();
       },
 
       SelectDirectory: async function() {
-        // Web 版本无法选择目录
-        return '';
+        var cur = '';
+        try { cur = await window.go.main.App.GetDataDir(); } catch (e) {}
+        return window.prompt('输入服务器目录路径', cur || '') || '';
       },
 
       // 代理相关
       GetProxy: async function() {
-        return localStorage.getItem('kiro_proxy') || '';
+        var r = await window.kiroAPI.getGlobalProxy();
+        return (r && r.proxy) || '';
       },
 
       SetProxy: async function(proxy) {
-        localStorage.setItem('kiro_proxy', proxy);
-        return { success: true };
+        return window.kiroAPI.setGlobalProxy(proxy);
       },
 
       ResetProxy: async function() {
-        localStorage.removeItem('kiro_proxy');
-        return { success: true };
-      },
-
-      DetectProxy: async function(proxy) {
-        // 简单验证代理格式
-        if (!proxy) return { valid: false, message: 'Empty proxy' };
-        if (proxy.match(/^(http|https|socks5):\/\/.+:\d+$/)) {
-          return { valid: true, message: 'Proxy format valid' };
-        }
-        return { valid: false, message: 'Invalid proxy format' };
+        return window.kiroAPI.resetGlobalProxy();
       },
 
       // 域名池相关
       ListDomainPool: async function() {
-        // Web 版本暂时返回空数组
-        return [];
+        try {
+          var list = await window.kiroAPI.listDomains();
+          return Array.isArray(list) ? list : [];
+        } catch (err) { return []; }
       },
 
       SetDomainEnabled: async function(domain, enabled) {
-        return { success: true };
+        return window.kiroAPI.enableDomain(domain, enabled);
       },
 
       UnbanDomain: async function(domain) {
-        return { success: true };
+        return window.kiroAPI.unbanDomain(domain);
       },
 
-      // 模型相关
       TestModelConnection: async function(modelId) {
-        // Web 版本暂不支持
-        return { success: false, message: 'Not supported in web version' };
+        try { return await window.kiroAPI.testModel(modelId); }
+        catch (err) { return { ok: false, error: err.message }; }
       },
 
       // CloudMail 相关
       GetCloudMailConfigs: async function() {
-        // Web 版本返回空配置
-        return [];
+        try {
+          var list = await window.kiroAPI.listCloudMail();
+          return Array.isArray(list) ? list : [];
+        } catch (err) {
+          console.error('GetCloudMailConfigs error:', err);
+          return [];
+        }
+      },
+
+      SaveCloudMailConfigs: async function(jsonStr) {
+        try {
+          var configs = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+          return await window.kiroAPI.saveCloudMail(configs);
+        } catch (err) {
+          console.error('SaveCloudMailConfigs error:', err);
+          return { error: err.message };
+        }
+      },
+
+      TestCloudMailConnection: async function(jsonStr) {
+        try {
+          var config = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+          return await window.kiroAPI.testCloudMail(config);
+        } catch (err) {
+          console.error('TestCloudMailConnection error:', err);
+          return { error: err.message };
+        }
       },
 
       SaveCloudMailConfig: async function(config) {
-        // Web 版本暂不支持
-        return { success: false, message: 'Not supported in web version' };
+        return window.go.main.App.SaveCloudMailConfigs(JSON.stringify([config]));
       },
 
       DeleteCloudMailConfig: async function(domain) {
-        // Web 版本暂不支持
         return { success: false, message: 'Not supported in web version' };
       },
 
@@ -423,8 +460,10 @@ window.go = {
       },
 
       ImportOutlookFile: async function(path) {
-        // Web 版本暂不支持文件导入
-        return { error: 'Web 版本暂不支持文件导入，请直接粘贴账号数据' };
+        var data = window._kiroImportText || '';
+        window._kiroImportText = '';
+        if (!data) return { error: '未选择文件' };
+        return window.kiroAPI.addOutlook(data);
       },
 
       ListProxyPool: async function() {
@@ -470,7 +509,7 @@ window.go = {
       },
 
       DetectProxy: async function(proxyStr) {
-        return window.kiroAPI.testProxy(proxyStr);
+        return window.kiroAPI.detectGlobalProxy(proxyStr);
       },
 
       // HTTP 邮箱：走服务端存储（与注册任务同一数据源）
@@ -534,7 +573,10 @@ window.go = {
       },
 
       ImportHttpAPIFile: async function(path) {
-        return { error: 'Web 版本暂不支持文件导入，请直接粘贴账号数据' };
+        var data = window._kiroImportText || '';
+        window._kiroImportText = '';
+        if (!data) return { error: '未选择文件' };
+        return window.kiroAPI.addHttpAPI(data);
       }
     }
   }

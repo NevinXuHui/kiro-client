@@ -162,6 +162,20 @@ class KiroAPI {
     return this.post('/httpapi/clear-registered', {});
   }
 
+  // ===== Cloud-Mail =====
+
+  async listCloudMail() {
+    return this.get('/cloudmail/list');
+  }
+
+  async saveCloudMail(configs) {
+    return this.post('/cloudmail/save', configs);
+  }
+
+  async testCloudMail(config) {
+    return this.post('/cloudmail/test', config);
+  }
+
   // ===== 号池相关 API =====
 
   // 获取号池列表
@@ -261,6 +275,33 @@ class KiroAPI {
   async getGatewayStatus() {
     return this.get('/gateway/status');
   }
+
+  async gatewayConfig(cfg) {
+    return this.post('/gateway/config', cfg || {});
+  }
+
+  async getDataDir() { return this.get('/config/data-dir'); }
+  async setDataDir(path) { return this.post('/config/data-dir', { path }); }
+  async resetDataDir() { return this.post('/config/data-dir/reset', {}); }
+  async getOutputDir() { return this.get('/config/output-dir'); }
+  async setOutputDir(path) { return this.post('/config/output-dir', { path }); }
+  async resetOutputDir() { return this.post('/config/output-dir/reset', {}); }
+  async getGlobalProxy() { return this.get('/config/proxy'); }
+  async setGlobalProxy(proxy) { return this.post('/config/proxy', { proxy }); }
+  async resetGlobalProxy() { return this.post('/config/proxy/reset', {}); }
+  async detectGlobalProxy(proxy) { return this.post('/config/proxy/detect', { proxy }); }
+
+  async listDomains() { return this.get('/domains/list'); }
+  async enableDomain(domain, enabled) { return this.post('/domains/enable', { domain, enabled }); }
+  async unbanDomain(domain) { return this.post('/domains/unban', { domain }); }
+
+  async loadOutputAccounts() { return this.get('/accounts/output'); }
+  async getSubscriptionPlans(email) { return this.post('/subscription/plans', { email }); }
+  async getSubscriptionLink(email, planType) { return this.post('/subscription/link', { email, planType }); }
+
+  async startManualRegister() { return this.post('/register/manual/start', {}); }
+  async getManualRegisterStatus() { return this.get('/register/manual/status'); }
+  async testModel(model) { return this.post('/models/test', { model }); }
 }
 
 // 创建全局 API 实例
