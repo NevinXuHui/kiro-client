@@ -1,0 +1,44 @@
+SUMMARY_VERIFY_ENHANCEMENT.md
+  52a05bc341379ecd 1-232
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "37e4555c66c13a4744aa4a2bb0bc43ba366a68c3",
+  "prompts": {
+    "52a05bc341379ecd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "768ad663-0592-4822-9170-2773d4a82146",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 232,
+      "total_deletions": 0,
+      "accepted_lines": 434,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 232,
+    "git_diff_deleted_lines": 0,
+    "ai_additions": 232,
+    "ai_accepted": 232,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 232,
+    "BYRC": 0,
+    "per_file": {
+      "SUMMARY_VERIFY_ENHANCEMENT.md": {
+        "BYMC": [],
+        "BYAC": [
+          "1-232"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787964096,
+  "requirement_id": ""
+}
