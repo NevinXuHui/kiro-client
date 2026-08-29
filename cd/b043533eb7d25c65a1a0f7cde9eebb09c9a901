@@ -1,0 +1,46 @@
+docs/VERIFY_LOGIC.md
+  52a05bc341379ecd 20-30,41,52-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "cdb043533eb7d25c65a1a0f7cde9eebb09c9a901",
+  "prompts": {
+    "52a05bc341379ecd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "768ad663-0592-4822-9170-2773d4a82146",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 34,
+      "total_deletions": 2,
+      "accepted_lines": 236,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 34,
+    "git_diff_deleted_lines": 2,
+    "ai_additions": 33,
+    "ai_accepted": 33,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 33,
+    "BYRC": 0,
+    "per_file": {
+      "docs/VERIFY_LOGIC.md": {
+        "BYMC": [],
+        "BYAC": [
+          "20-30",
+          "41",
+          "52-72"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787964012,
+  "requirement_id": ""
+}
