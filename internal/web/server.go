@@ -490,7 +490,10 @@ func (s *Server) HandlePoolImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Data string `json:"data"`
+		Data          string `json:"data"`
+		Verify        bool   `json:"verify"`        // 是否验活
+		Concurrency   int    `json:"concurrency"`   // 验活并发数
+		SkipSuspended bool   `json:"skipSuspended"` // 跳过已封禁账号
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.respondJSON(w, map[string]interface{}{"error": "Invalid request body"})
@@ -503,6 +506,52 @@ func (s *Server) HandlePoolImport(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(accounts) == 0 {
 		s.respondJSON(w, map[string]interface{}{"error": "未找到有效账号"})
+		return
+	}
+
+	// 验活（如果启用）
+	verifyStats := map[string]int{"total": len(accounts)}
+	if req.Verify {
+		if req.Concurrency <= 0 {
+			req.Concurrency = 3
+		}
+		log.Printf("[导入] 开始验活 %d 个账号，并发数 %d", len(accounts), req.Concurrency)
+		pool.BatchVerify(accounts, "", req.Concurrency)
+
+		// 统计验活结果
+		active, suspended, unknown := 0, 0, 0
+		for _, acc := range accounts {
+			switch acc.HealthStatus {
+			case "active":
+				active++
+			case "suspended":
+				suspended++
+			default:
+				unknown++
+			}
+		}
+		verifyStats["active"] = active
+		verifyStats["suspended"] = suspended
+		verifyStats["unknown"] = unknown
+
+		// 过滤掉已封禁账号（如果启用）
+		if req.SkipSuspended {
+			filtered := make([]*pool.Account, 0, len(accounts))
+			for _, acc := range accounts {
+				if acc.HealthStatus != "suspended" {
+					filtered = append(filtered, acc)
+				}
+			}
+			log.Printf("[导入] 验活后过滤：%d 个可用，%d 个已封禁", len(filtered), len(accounts)-len(filtered))
+			accounts = filtered
+		}
+	}
+
+	if len(accounts) == 0 {
+		s.respondJSON(w, map[string]interface{}{
+			"error":       "验活后无可用账号",
+			"verifyStats": verifyStats,
+		})
 		return
 	}
 
@@ -520,17 +569,27 @@ func (s *Server) HandlePoolImport(w http.ResponseWriter, r *http.Request) {
 			s.respondJSON(w, map[string]interface{}{"error": err.Error()})
 			return
 		}
-		s.respondJSON(w, poolToMap(created))
+		result := poolToMap(created)
+		if req.Verify {
+			result["verifyStats"] = verifyStats
+		}
+		s.respondJSON(w, result)
 		return
 	}
 	added := 0
+	skipped := 0
 	for _, acc := range accounts {
 		if err := mgr.AddAccountToPool(defaultPool.ID, acc); err == nil {
 			added++
+		} else {
+			skipped++
 		}
 	}
 	if added == 0 {
-		s.respondJSON(w, map[string]interface{}{"error": "所有账号已存在或验证失败"})
+		s.respondJSON(w, map[string]interface{}{
+			"error":       "所有账号已存在或验证失败",
+			"verifyStats": verifyStats,
+		})
 		return
 	}
 	updated, err := mgr.Get(defaultPool.ID)
@@ -538,7 +597,13 @@ func (s *Server) HandlePoolImport(w http.ResponseWriter, r *http.Request) {
 		s.respondJSON(w, map[string]interface{}{"error": err.Error()})
 		return
 	}
-	s.respondJSON(w, poolToMap(updated))
+	result := poolToMap(updated)
+	result["imported"] = added
+	result["skipped"] = skipped
+	if req.Verify {
+		result["verifyStats"] = verifyStats
+	}
+	s.respondJSON(w, result)
 }
 
 func resolvePool(mgr *pool.Manager, id, name string) (*pool.Pool, error) {
