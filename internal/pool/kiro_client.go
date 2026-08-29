@@ -7,11 +7,13 @@ import (
 	"io"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	fhttp "github.com/bogdanfinn/fhttp"
 	tls_client "github.com/bogdanfinn/tls-client"
 	"github.com/bogdanfinn/tls-client/profiles"
+	"github.com/google/uuid"
 )
 
 // KiroClient Kiro账号健康检测和额度查询客户端
@@ -141,6 +143,9 @@ func classifyHealthError(err error) (healthStatus, healthCode string) {
 const kiroRESTIDEVersion = "2.3.0"
 const builderIDProfileARN = "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX"
 
+// CreateSubscriptionToken 端点（升级 Pro 接口，最敏感的封号检测）
+const createSubscriptionTokenURL = "https://q.us-east-1.amazonaws.com/CreateSubscriptionToken"
+
 func usageQueryProfileArn(arn string) string {
 	arn = strings.TrimSpace(arn)
 	if arn == "" {
@@ -154,6 +159,13 @@ func applyQRESTHeaders(h fhttp.Header, accessToken string) {
 	h.Set("Accept", "application/json")
 	h.Set("User-Agent", "aws-sdk-js/1.0.0 ua/2.1 os/linux lang/js md/nodejs#22.22.0 api/codewhispererruntime#1.0.0 m/N,E KiroIDE-"+kiroRESTIDEVersion+"-kiroclient")
 	h.Set("x-amz-user-agent", "aws-sdk-js/1.0.0 KiroIDE-"+kiroRESTIDEVersion+"-kiroclient")
+}
+
+func applySubscriptionHeaders(h fhttp.Header, accessToken string) {
+	applyQRESTHeaders(h, accessToken)
+	h.Set("Content-Type", "application/json")
+	h.Set("amz-sdk-invocation-id", uuid.NewString())
+	h.Set("amz-sdk-request", "attempt=1; max=1")
 }
 
 func usageLimitsURL(region, profileArn string) string {
@@ -415,6 +427,57 @@ func (c *KiroClient) GetAvailableModels(account *Account, accessToken string) ([
 	return fallback, 0
 }
 
+// ProbeCreateSubscriptionToken 探测升级 Pro 接口（最敏感的封号检测）
+// 封号号在用量/模型 200 时这里仍会 403
+func (c *KiroClient) ProbeCreateSubscriptionToken(account *Account, accessToken string) (int, error) {
+	profileArn := builderIDProfileARN
+	if account != nil && account.ProfileArn != "" {
+		profileArn = account.ProfileArn
+	}
+
+	body, _ := json.Marshal(map[string]string{
+		"clientToken":      uuid.NewString(),
+		"profileArn":       profileArn,
+		"provider":         "STRIPE",
+		"subscriptionType": "Q_DEVELOPER_STANDALONE_PRO",
+	})
+
+	req, err := fhttp.NewRequest("POST", createSubscriptionTokenURL, bytes.NewReader(body))
+	if err != nil {
+		return 0, fmt.Errorf("构建请求失败: %w", err)
+	}
+	applySubscriptionHeaders(req.Header, accessToken)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, _ := io.ReadAll(resp.Body)
+	statusCode := resp.StatusCode
+
+	// 403/423 判死
+	if statusCode == 403 || statusCode == 423 {
+		return statusCode, fmt.Errorf("升级 Pro 接口 %d（封号）", statusCode)
+	}
+
+	// 400 且已有订阅视为存活
+	if statusCode == 400 && strings.Contains(string(raw), "already") {
+		return statusCode, nil
+	}
+
+	if statusCode != 200 {
+		detail := string(raw)
+		if len(detail) > 200 {
+			detail = detail[:200]
+		}
+		return statusCode, fmt.Errorf("HTTP %d: %s", statusCode, detail)
+	}
+
+	return statusCode, nil
+}
+
 // UpdateAccountInfo 更新账号运行时信息（健康状态、额度、模型）
 // 从 GetUsageLimits 解析出 CreditUsed/CreditLimit，供无感轮询决策。
 // 增强验活：403 判死（参考 core.VerifyAlive）
@@ -444,23 +507,59 @@ func (c *KiroClient) UpdateAccountInfo(account *Account) error {
 	account.HealthError = ""
 	account.HealthCheckedAt = now
 
-	// 2. 查询额度（403 判死）
-	usage, err := c.GetUsage(account, accessToken)
-	if err != nil {
-		// 检查是否是 403 封号信号
-		if strings.Contains(err.Error(), "HTTP 403") {
-			account.HealthStatus = "suspended"
-			account.HealthCode = "AUTH"
-			account.HealthError = "Q 端点 403，账号已封禁"
-			account.LastUpdatedAt = now
-			return fmt.Errorf("account suspended: Q endpoint 403")
-		}
+	// 2. 并行探测用量、模型和订阅接口（403 判死）
+	var (
+		usage       map[string]interface{}
+		usageErr    error
+		models      []string
+		modelStatus int
+		subStatus   int
+		wg          sync.WaitGroup
+	)
 
-		// 额度查询失败不算健康问题，可能是 API 限制
-		account.UsageQuotas = map[string]interface{}{
-			"error": err.Error(),
-		}
-	} else {
+	wg.Add(3)
+	go func() {
+		defer wg.Done()
+		usage, usageErr = c.GetUsage(account, accessToken)
+	}()
+	go func() {
+		defer wg.Done()
+		models, modelStatus = c.GetAvailableModels(account, accessToken)
+	}()
+	go func() {
+		defer wg.Done()
+		subStatus, _ = c.ProbeCreateSubscriptionToken(account, accessToken)
+	}()
+	wg.Wait()
+
+	// 3. 封号判定（任一接口 403 即判死）
+	if usageErr != nil && strings.Contains(usageErr.Error(), "HTTP 403") {
+		account.HealthStatus = "suspended"
+		account.HealthCode = "AUTH"
+		account.HealthError = "Q 端点 403（用量查询），账号已封禁"
+		account.LastUpdatedAt = now
+		return fmt.Errorf("account suspended: usage endpoint 403")
+	}
+
+	if modelStatus == 403 {
+		account.HealthStatus = "suspended"
+		account.HealthCode = "AUTH"
+		account.HealthError = "Q 端点 403（模型列表），账号已封禁"
+		account.LastUpdatedAt = now
+		return fmt.Errorf("account suspended: models endpoint 403")
+	}
+
+	// CreateSubscriptionToken 403/423 是最可靠的封号信号
+	if subStatus == 403 || subStatus == 423 {
+		account.HealthStatus = "suspended"
+		account.HealthCode = "AUTH"
+		account.HealthError = fmt.Sprintf("Q 端点 %d（升级 Pro 接口），账号已封禁", subStatus)
+		account.LastUpdatedAt = now
+		return fmt.Errorf("account suspended: subscription endpoint %d", subStatus)
+	}
+
+	// 4. 解析用量和模型
+	if usageErr == nil {
 		account.UsageQuotas = usage
 		// 从 GetUsageLimits 结果提取 CreditUsed/CreditLimit（9router parseKiroQuotaData 同款）
 		if quotas, ok := usage["quotas"].(map[string]interface{}); ok {
@@ -481,17 +580,13 @@ func (c *KiroClient) UpdateAccountInfo(account *Account) error {
 				}
 			}
 		}
+	} else {
+		// 额度查询失败不算健康问题，可能是 API 限制
+		account.UsageQuotas = map[string]interface{}{
+			"error": usageErr.Error(),
+		}
 	}
 
-	// 3. 获取可用模型（403 判死）
-	models, modelStatus := c.GetAvailableModels(account, accessToken)
-	if modelStatus == 403 {
-		account.HealthStatus = "suspended"
-		account.HealthCode = "AUTH"
-		account.HealthError = "ListAvailableModels 403，账号已封禁"
-		account.LastUpdatedAt = now
-		return fmt.Errorf("account suspended: models endpoint 403")
-	}
 	account.AvailableModels = models
 
 	account.LastUpdatedAt = now
