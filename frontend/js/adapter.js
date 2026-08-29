@@ -91,6 +91,15 @@ window.go = {
         }
       },
 
+      StopTask: async function() {
+        try {
+          return await window.kiroAPI.stopRegister();
+        } catch (err) {
+          console.error('StopTask error:', err);
+          return { error: err.message };
+        }
+      },
+
       GetLogs: async function() {
         try {
           const logs = await window.kiroAPI.getLogs();

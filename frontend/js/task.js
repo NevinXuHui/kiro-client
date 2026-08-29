@@ -183,7 +183,11 @@ async function startTask() {
       return;
     }
     updateUIStatus(true);
-    showToast(_tkT('toast.taskStarted', '任务已启动'));
+    if (result.status === 'appended') {
+      showToast(_tkT('toast.taskAppended', { n: result.added, t: result.total }, '已追加 {n} 个任务，合计 {t}'));
+    } else {
+      showToast(_tkT('toast.taskStarted', '任务已启动'));
+    }
   } catch(e) {
     showToast(_tkT('toast.taskStartFailed', '启动失败') + ': ' + e.message, 'error');
   }

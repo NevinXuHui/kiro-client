@@ -277,12 +277,20 @@ async function resetProxy() {
   }
 }
 
-// UI 状态
+// UI 状态：运行中仍可点「开始注册」追加数量，仅停止按钮随运行态切换
 function updateUIStatus(running) {
   var btnStart = document.getElementById('btn-start');
   var btnStop = document.getElementById('btn-stop');
-  if (btnStart) btnStart.disabled = running;
+  var startLabel = document.getElementById('btn-start-label');
+  if (btnStart) btnStart.disabled = false;
   if (btnStop) btnStop.disabled = !running;
+  if (startLabel) {
+    var key = running ? 'register.appendBtn' : 'register.startBtn';
+    var fallback = running ? '追加注册' : '开始注册';
+    startLabel.setAttribute('data-i18n', key);
+    startLabel.textContent = (typeof t === 'function' ? t(key) : fallback) || fallback;
+    if (startLabel.textContent === key) startLabel.textContent = fallback;
+  }
 }
 
 // 配置读写
@@ -290,7 +298,7 @@ function getFormConfig() {
   const config = {
     count: parseInt(document.getElementById('cfg-count').value) || 1,
     concurrency: parseInt(document.getElementById('cfg-concurrency').value) || 1,
-    delay: parseInt(document.getElementById('cfg-delay').value) || 3,
+    delay: parseFloat(document.getElementById('cfg-delay').value) || 3,
     emailProvider: selectedEmailProvider || 'outlook',
     saveWithoutVerify: document.getElementById('cfg-save-without-verify')?.checked !== false,
     saveLoginPassword: document.getElementById('cfg-save-login-password')?.checked !== false

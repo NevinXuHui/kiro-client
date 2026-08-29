@@ -327,11 +327,11 @@
                   </div>
 
                   <div class="btn-group" style="margin-top:18px">
-                    <button class="btn btn-primary" onclick="startTask()">
+                    <button class="btn btn-primary" id="btn-start" onclick="startTask()">
                       <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                      <span data-i18n="register.startBtn">开始注册</span>
+                      <span data-i18n="register.startBtn" id="btn-start-label">开始注册</span>
                     </button>
-                    <button class="btn btn-outline" onclick="stopTask()" style="color:var(--red)">
+                    <button class="btn btn-outline" id="btn-stop" onclick="stopTask()" style="color:var(--red)">
                       <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
                       <span data-i18n="register.stopBtn">停止</span>
                     </button>
