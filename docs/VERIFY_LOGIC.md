@@ -116,10 +116,14 @@ func NeedsRefresh(acc *Account, now time.Time, ttl time.Duration) bool
 | 项目 | kiro-client | KiroClaim |
 |------|-------------|-----------|
 | Token 刷新 | IDC → Social 回退 | IDC → Social 回退 |
-| 封号判定 | 401/403 + Q 端点 403 | 401/403 + Q 端点 403 + CreateSubscriptionToken |
-| 并行探测 | 用量 + 模型 | 用量 + 模型 + 升级接口 |
+| 封号判定 | 401/403 + Q 端点 403 + **CreateSubscriptionToken** | 401/403 + Q 端点 403 + CreateSubscriptionToken |
+| 并行探测 | 用量 + 模型 + **订阅接口** | 用量 + 模型 + 升级接口 |
+| 最敏感检测 | **CreateSubscriptionToken 403/423** | CreateSubscriptionToken 403/423 |
 | 状态码 | healthy/unhealthy/suspended | active/suspended |
 | 重试策略 | 9router 惰性（AUTH 不重试） | 后台自动刷新 |
+| 性能优化 | **并发执行 ~100ms** | 并发执行 |
+
+**现在完全对齐 KiroClaim 标准！** ✅
 
 ## API 接口
 
