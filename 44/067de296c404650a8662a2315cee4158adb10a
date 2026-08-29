@@ -1,0 +1,19 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "44067de296c404650a8662a2315cee4158adb10a",
+  "prompts": {},
+  "commit_stats": {
+    "git_diff_added_lines": 0,
+    "git_diff_deleted_lines": 0,
+    "ai_additions": 0,
+    "ai_accepted": 0,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 0,
+    "BYRC": 0
+  },
+  "commit_timestamp": 1787962825,
+  "requirement_id": ""
+}
