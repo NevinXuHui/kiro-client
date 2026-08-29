@@ -1,0 +1,147 @@
+internal/web/server.go
+  40c1de226dfd26da 29-31
+frontend/js/adapter.js
+  40c1de226dfd26da 360-386,390
+frontend/index.html
+  40c1de226dfd26da 11-12
+internal/web/extra.go
+  40c1de226dfd26da 1-527
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "72808859aaead106edfcd6e345d1b0ebd128cfb6",
+  "prompts": {
+    "40c1de226dfd26da": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "150d9e8a-ed1a-4378-aced-d9fc6c474e40",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 588,
+      "total_deletions": 14,
+      "accepted_lines": 588,
+      "overriden_lines": 0
+    },
+    "52a05bc341379ecd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "768ad663-0592-4822-9170-2773d4a82146",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 202,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 847,
+    "git_diff_deleted_lines": 68,
+    "ai_additions": 560,
+    "ai_accepted": 560,
+    "BYMC": 282,
+    "mixed_additions": 0,
+    "BYAC": 560,
+    "BYRC": 0,
+    "per_file": {
+      "cmd/web/main.go": {
+        "BYMC": [
+          "66-89"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "frontend/index.html": {
+        "BYMC": [],
+        "BYAC": [
+          "11-12"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/adapter.js": {
+        "BYMC": [
+          "114-120",
+          "127-144",
+          "259-260",
+          "286-287",
+          "292-293",
+          "297",
+          "301",
+          "305-306",
+          "310",
+          "314",
+          "318-320",
+          "325-326",
+          "330",
+          "334",
+          "339-342",
+          "346",
+          "350",
+          "354-355",
+          "463-466",
+          "512",
+          "576-579"
+        ],
+        "BYAC": [
+          "360-386",
+          "390"
+        ],
+        "BYRC": []
+      },
+      "frontend/js/api.js": {
+        "BYMC": [
+          "165-178",
+          "278-304"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/web/cloudmail_test.go": {
+        "BYMC": [
+          "1-37"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/web/extra.go": {
+        "BYMC": [],
+        "BYAC": [
+          "1-527"
+        ],
+        "BYRC": []
+      },
+      "internal/web/extra_test.go": {
+        "BYMC": [
+          "1-56"
+        ],
+        "BYAC": [],
+        "BYRC": []
+      },
+      "internal/web/server.go": {
+        "BYMC": [
+          "6",
+          "45",
+          "888-924",
+          "944-949",
+          "952-953",
+          "955-959",
+          "961-962",
+          "1012-1013",
+          "1016-1019",
+          "1062-1064"
+        ],
+        "BYAC": [
+          "29-31"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787972022,
+  "requirement_id": ""
+}
