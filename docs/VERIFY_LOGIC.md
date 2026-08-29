@@ -17,7 +17,17 @@ accessToken, err := c.RefreshAccessToken(account)
 - ❌ **401/403** → `suspended`（账号吊销/封禁，判死）
 - ⚠️ **其他错误** → `unhealthy`（临时错误，可重试）
 
-### 2. 查询用量（GetUsageLimits）
+### 2. 并行探测三个接口（最严格封号检测）
+
+**并发执行：**
+```go
+// 同时探测三个接口，减少延迟
+go func() { usage, usageErr = c.GetUsage(account, accessToken) }()
+go func() { models, modelStatus = c.GetAvailableModels(account, accessToken) }()
+go func() { subStatus, _ = c.ProbeCreateSubscriptionToken(account, accessToken) }()
+```
+
+#### 2.1 GetUsageLimits（用量查询）
 
 ```go
 usage, err := c.GetUsage(account, accessToken)
@@ -28,7 +38,7 @@ usage, err := c.GetUsage(account, accessToken)
 - ❌ **403** → `suspended`（Q 端点封号信号）
 - ⚠️ **其他错误** → 不影响健康状态（可能是 API 限制）
 
-### 3. 查询模型（ListAvailableModels）
+#### 2.2 ListAvailableModels（模型列表）
 
 ```go
 models, statusCode := c.GetAvailableModels(account, accessToken)
@@ -38,6 +48,28 @@ models, statusCode := c.GetAvailableModels(account, accessToken)
 - ✅ **200** → 返回可用模型列表
 - ❌ **403** → `suspended`（模型接口封号）
 - ⚠️ **其他错误** → 返回默认模型列表
+
+#### 2.3 CreateSubscriptionToken（升级 Pro 接口，最敏感）⭐
+
+```go
+statusCode, err := c.ProbeCreateSubscriptionToken(account, accessToken)
+```
+
+**判定规则（最严格）：**
+- ✅ **200** → 可以升级 Pro
+- ✅ **400 + "already"** → 已有订阅，视为存活
+- ❌ **403/423** → `suspended`（**最可靠的封号信号**）
+- ⚠️ **其他错误** → 不影响健康状态
+
+**为什么这个最敏感？**
+> 封号账号在用量/模型接口可能仍返回 200，但升级 Pro 接口会 403。这是 AWS 最严格的权限检查点。
+
+### 3. 封号判定优先级
+
+任一接口 403 即判死，优先级：
+1. **CreateSubscriptionToken 403/423** → 最可靠（封号号用量/模型可能仍 200）
+2. **GetUsageLimits 403** → Q 端点封号
+3. **ListAvailableModels 403** → 模型权限封禁
 
 ## 健康状态分类
 
