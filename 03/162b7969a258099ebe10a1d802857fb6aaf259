@@ -1,0 +1,33 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "03162b7969a258099ebe10a1d802857fb6aaf259",
+  "prompts": {
+    "52a05bc341379ecd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "768ad663-0592-4822-9170-2773d4a82146",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 202,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 0,
+    "git_diff_deleted_lines": 0,
+    "ai_additions": 0,
+    "ai_accepted": 0,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 0,
+    "BYRC": 0
+  },
+  "commit_timestamp": 1787963981,
+  "requirement_id": ""
+}
