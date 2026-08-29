@@ -1,0 +1,44 @@
+CHANGELOG_VERIFY.md
+  52a05bc341379ecd 1-151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "c80a30beda9b71a64c3a266699a6944992ebdbd4",
+  "prompts": {
+    "52a05bc341379ecd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "768ad663-0592-4822-9170-2773d4a82146",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 151,
+      "total_deletions": 0,
+      "accepted_lines": 151,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 151,
+    "git_diff_deleted_lines": 0,
+    "ai_additions": 151,
+    "ai_accepted": 151,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 151,
+    "BYRC": 0,
+    "per_file": {
+      "CHANGELOG_VERIFY.md": {
+        "BYMC": [],
+        "BYAC": [
+          "1-151"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787963740,
+  "requirement_id": ""
+}
