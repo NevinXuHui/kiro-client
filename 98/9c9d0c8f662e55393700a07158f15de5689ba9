@@ -1,0 +1,56 @@
+internal/pool/kiro_client.go
+  52a05bc341379ecd 347,361,380,383-388,391,412,415,420,424-425,433-438,447,450-458,486-495
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "989c9d0c8f662e55393700a07158f15de5689ba9",
+  "prompts": {
+    "52a05bc341379ecd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "768ad663-0592-4822-9170-2773d4a82146",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 47,
+      "total_deletions": 27,
+      "accepted_lines": 41,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 41,
+    "git_diff_deleted_lines": 21,
+    "ai_additions": 41,
+    "ai_accepted": 41,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 41,
+    "BYRC": 0,
+    "per_file": {
+      "internal/pool/kiro_client.go": {
+        "BYMC": [],
+        "BYAC": [
+          "347",
+          "361",
+          "380",
+          "383-388",
+          "391",
+          "412",
+          "415",
+          "420",
+          "424-425",
+          "433-438",
+          "447",
+          "450-458",
+          "486-495"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787963642,
+  "requirement_id": ""
+}
