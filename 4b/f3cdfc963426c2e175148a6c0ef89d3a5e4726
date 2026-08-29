@@ -1,0 +1,136 @@
+internal/task/coordinator.go
+  52a05bc341379ecd 11,26,43-46,50,53,55-57,60,62,73-75,82,85,87,90-99,104-109,117-124,126-137,139-141,143-163,165-171,173-189,191-197,208-211,797,845
+internal/web/server.go
+  52a05bc341379ecd 162
+internal/task/coordinator_test.go
+  52a05bc341379ecd 5-7,10-26
+internal/task/state.go
+  52a05bc341379ecd 7-8,11-15,31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "4bf3cdfc963426c2e175148a6c0ef89d3a5e4726",
+  "prompts": {
+    "52a05bc341379ecd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "768ad663-0592-4822-9170-2773d4a82146",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 196,
+      "total_deletions": 82,
+      "accepted_lines": 185,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 436,
+    "git_diff_deleted_lines": 121,
+    "ai_additions": 145,
+    "ai_accepted": 145,
+    "BYMC": 285,
+    "mixed_additions": 0,
+    "BYAC": 145,
+    "BYRC": 0,
+    "per_file": {
+      "internal/task/coordinator.go": {
+        "BYMC": [
+          "24-25",
+          "27-28",
+          "100-103",
+          "110-116",
+          "256",
+          "258-263",
+          "267-274",
+          "400-406",
+          "419",
+          "432",
+          "444",
+          "463",
+          "467",
+          "488",
+          "507",
+          "521",
+          "541",
+          "545",
+          "550",
+          "563",
+          "586",
+          "590",
+          "596",
+          "618",
+          "624",
+          "642",
+          "684",
+          "726-795",
+          "800-804",
+          "806-831",
+          "833-840",
+          "846-848",
+          "852-861"
+        ],
+        "BYAC": [
+          "11",
+          "26",
+          "43-46",
+          "50",
+          "53",
+          "55-57",
+          "60",
+          "62",
+          "73-75",
+          "82",
+          "85",
+          "87",
+          "90-99",
+          "104-109",
+          "117-124",
+          "126-137",
+          "139-141",
+          "143-163",
+          "165-171",
+          "173-189",
+          "191-197",
+          "208-211",
+          "797",
+          "845"
+        ],
+        "BYRC": []
+      },
+      "internal/task/coordinator_test.go": {
+        "BYMC": [
+          "33",
+          "96-197"
+        ],
+        "BYAC": [
+          "5-7",
+          "10-26"
+        ],
+        "BYRC": []
+      },
+      "internal/task/state.go": {
+        "BYMC": [
+          "32-35"
+        ],
+        "BYAC": [
+          "7-8",
+          "11-15",
+          "31"
+        ],
+        "BYRC": []
+      },
+      "internal/web/server.go": {
+        "BYMC": [],
+        "BYAC": [
+          "162"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787962778,
+  "requirement_id": ""
+}
