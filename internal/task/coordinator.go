@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"reg_go/internal/core"
@@ -20,11 +21,11 @@ import (
 
 // StartTaskRequest 启动任务请求
 type StartTaskRequest struct {
-	Count         int    `json:"count"`
-	Concurrency   int    `json:"concurrency"`
-	Delay         int    `json:"delay"`
-	OutputPath    string `json:"outputPath"`
-	EmailProvider string `json:"emailProvider"` // "outlook" / "cloudmail" / "httpapi"
+	Count         int     `json:"count"`
+	Concurrency   int     `json:"concurrency"`
+	Delay         float64 `json:"delay"`
+	OutputPath    string  `json:"outputPath"`
+	EmailProvider string  `json:"emailProvider"` // "outlook" / "cloudmail" / "httpapi"
 
 	CloudMailDomains    []string                           `json:"cloudmailDomains"`
 	CloudMailConfigs    map[string][]email.CloudMailConfig `json:"cloudmailConfigs"`
@@ -39,38 +40,26 @@ func StartTask(req StartTaskRequest) map[string]interface{} {
 	return startTask(req)
 }
 
-// startTask 启动注册任务（私有方法）
-func startTask(req StartTaskRequest) map[string]interface{} {
-	Manager.mu.Lock()
-	if Manager.running {
-		Manager.mu.Unlock()
-		return map[string]interface{}{"error": "任务正在运行中"}
+// collectAccounts 收集本次要消耗的邮箱账号。reserved 中的邮箱视为已被当前批次占用。
+func collectAccounts(req StartTaskRequest, emailProvider string, reserved map[string]bool) ([]email.OutlookAccount, []email.HttpAPIAccount, string) {
+	if reserved == nil {
+		reserved = map[string]bool{}
 	}
-
-	// 根据邮箱提供商类型处理
-	emailProvider := req.EmailProvider
-	if emailProvider == "" {
-		emailProvider = "outlook" // 默认使用 Outlook
-	}
-
-	var outlookAccounts []email.OutlookAccount
-	var httpAPIAccounts []email.HttpAPIAccount
-
 	if emailProvider == "cloudmail" {
 		if len(req.CloudMailDomains) == 0 {
-			Manager.mu.Unlock()
-			return map[string]interface{}{"error": "请选择至少一个 cloud-mail 域名"}
+			return nil, nil, "请选择至少一个 cloud-mail 域名"
 		}
 		if len(req.CloudMailConfigs) == 0 {
-			Manager.mu.Unlock()
-			return map[string]interface{}{"error": "cloud-mail 配置缺失"}
+			return nil, nil, "cloud-mail 配置缺失"
 		}
-	} else if emailProvider == "httpapi" {
+		return nil, nil, ""
+	}
+	if emailProvider == "httpapi" {
 		storedAccounts := storage.GetHttpAPICached()
 		if len(storedAccounts) == 0 {
-			Manager.mu.Unlock()
-			return map[string]interface{}{"error": "请先添加 HTTP 邮箱账号"}
+			return nil, nil, "请先添加 HTTP 邮箱账号"
 		}
+		var httpAPIAccounts []email.HttpAPIAccount
 		for _, acc := range storedAccounts {
 			registered, _ := acc["registered"].(bool)
 			if registered {
@@ -81,61 +70,133 @@ func startTask(req StartTaskRequest) map[string]interface{} {
 			if emailAddr == "" || apiURL == "" {
 				continue
 			}
+			if reserved[emailAddr] {
+				continue
+			}
 			httpAPIAccounts = append(httpAPIAccounts, email.HttpAPIAccount{
 				Email:  emailAddr,
 				APIURL: apiURL,
 			})
 		}
 		if len(httpAPIAccounts) == 0 {
-			Manager.mu.Unlock()
-			return map[string]interface{}{"error": "没有可用的 HTTP 邮箱账号（所有账号已注册成功）"}
+			return nil, nil, "没有可用的 HTTP 邮箱账号（所有账号已注册成功）"
 		}
 		if len(httpAPIAccounts) < req.Count {
-			Manager.mu.Unlock()
-			return map[string]interface{}{
-				"error": fmt.Sprintf("可用 HTTP 邮箱不足: 需要 %d, 仅有 %d", req.Count, len(httpAPIAccounts)),
-			}
+			return nil, nil, fmt.Sprintf("可用 HTTP 邮箱不足: 需要 %d, 仅有 %d", req.Count, len(httpAPIAccounts))
 		}
-	} else {
-		// Outlook 模式：加载账号列表
-		storedAccounts := storage.GetAccountsCached()
-		if len(storedAccounts) == 0 {
-			Manager.mu.Unlock()
-			return map[string]interface{}{"error": "请先添加 Outlook 账号"}
-		}
-
-		// 筛选未注册的账号
-		for _, acc := range storedAccounts {
-			registered, _ := acc["registered"].(bool)
-			if !registered {
-				emailAddr, _ := acc["email"].(string)
-				password, _ := acc["password"].(string)
-				clientID, _ := acc["clientId"].(string)
-				refreshToken, _ := acc["refreshToken"].(string)
-
-				outlookAccounts = append(outlookAccounts, email.OutlookAccount{
-					Email:        emailAddr,
-					Password:     password,
-					ClientID:     clientID,
-					RefreshToken: refreshToken,
-				})
-			}
-		}
-
-		if len(outlookAccounts) == 0 {
-			Manager.mu.Unlock()
-			return map[string]interface{}{"error": "没有可用的 Outlook 账号（所有账号已注册成功）"}
-		}
-
-		if len(outlookAccounts) < req.Count {
-			Manager.mu.Unlock()
-			return map[string]interface{}{
-				"error": fmt.Sprintf("可用 Outlook 账号不足: 需要 %d, 仅有 %d", req.Count, len(outlookAccounts)),
-			}
-		}
+		return nil, httpAPIAccounts, ""
 	}
 
-	// 初始化状态
+	storedAccounts := storage.GetAccountsCached()
+	if len(storedAccounts) == 0 {
+		return nil, nil, "请先添加 Outlook 账号"
+	}
+	var outlookAccounts []email.OutlookAccount
+	for _, acc := range storedAccounts {
+		registered, _ := acc["registered"].(bool)
+		if registered {
+			continue
+		}
+		emailAddr, _ := acc["email"].(string)
+		password, _ := acc["password"].(string)
+		clientID, _ := acc["clientId"].(string)
+		refreshToken, _ := acc["refreshToken"].(string)
+		if emailAddr == "" {
+			continue
+		}
+		if reserved[emailAddr] {
+			continue
+		}
+		outlookAccounts = append(outlookAccounts, email.OutlookAccount{
+			Email:        emailAddr,
+			Password:     password,
+			ClientID:     clientID,
+			RefreshToken: refreshToken,
+		})
+	}
+	if len(outlookAccounts) == 0 {
+		return nil, nil, "没有可用的 Outlook 账号（所有账号已注册成功）"
+	}
+	if len(outlookAccounts) < req.Count {
+		return nil, nil, fmt.Sprintf("可用 Outlook 账号不足: 需要 %d, 仅有 %d", req.Count, len(outlookAccounts))
+	}
+	return outlookAccounts, nil, ""
+}
+
+func reserveEmails(reserved map[string]bool, outlook []email.OutlookAccount, httpapi []email.HttpAPIAccount) map[string]bool {
+	if reserved == nil {
+		reserved = map[string]bool{}
+	}
+	for _, a := range outlook {
+		if a.Email != "" {
+			reserved[a.Email] = true
+		}
+	}
+	for _, a := range httpapi {
+		if a.Email != "" {
+			reserved[a.Email] = true
+		}
+	}
+	return reserved
+}
+
+// appendRunningTask 在已有批次上追加数量。调用方必须持有 Manager.mu。
+func appendRunningTask(req StartTaskRequest, emailProvider string) map[string]interface{} {
+	if Manager.provider != "" && Manager.provider != emailProvider {
+		return map[string]interface{}{
+			"error": fmt.Sprintf("当前任务邮箱类型为 %s，无法追加 %s", Manager.provider, emailProvider),
+		}
+	}
+	outlookAccounts, httpAPIAccounts, errMsg := collectAccounts(req, emailProvider, Manager.reserved)
+	if errMsg != "" {
+		return map[string]interface{}{"error": errMsg}
+	}
+	Manager.reserved = reserveEmails(Manager.reserved, outlookAccounts, httpAPIAccounts)
+	Manager.total += req.Count
+	Manager.extra = append(Manager.extra, extraBatch{
+		outlook: outlookAccounts,
+		httpapi: httpAPIAccounts,
+	})
+	if ch := Manager.wakeCh; ch != nil {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+	return map[string]interface{}{
+		"status": "appended",
+		"added":  req.Count,
+		"total":  Manager.total,
+	}
+}
+
+// startTask 启动注册任务；若已有任务在跑，则把本次数量追加进去。
+func startTask(req StartTaskRequest) map[string]interface{} {
+	if req.Count <= 0 {
+		return map[string]interface{}{"error": "注册数量必须大于 0"}
+	}
+
+	emailProvider := req.EmailProvider
+	if emailProvider == "" {
+		emailProvider = "outlook"
+	}
+
+	Manager.mu.Lock()
+	if Manager.running {
+		result := appendRunningTask(req, emailProvider)
+		Manager.mu.Unlock()
+		if result["status"] == "appended" {
+			log.Printf("[Kiro] 追加 %d 个任务，合计 %d", result["added"], result["total"])
+		}
+		return result
+	}
+
+	outlookAccounts, httpAPIAccounts, errMsg := collectAccounts(req, emailProvider, nil)
+	if errMsg != "" {
+		Manager.mu.Unlock()
+		return map[string]interface{}{"error": errMsg}
+	}
+
 	Manager.running = true
 	Manager.stopCh = make(chan struct{})
 	Manager.total = req.Count
@@ -144,14 +205,16 @@ func startTask(req StartTaskRequest) map[string]interface{} {
 	Manager.failed = 0
 	Manager.results = nil
 	Manager.startTime = time.Now()
+	Manager.provider = emailProvider
+	Manager.extra = nil
+	Manager.reserved = reserveEmails(nil, outlookAccounts, httpAPIAccounts)
+	Manager.wakeCh = make(chan struct{}, 1)
 	Manager.mu.Unlock()
 
-	// 清空日志
 	Manager.logsMu.Lock()
 	Manager.logs = nil
 	Manager.logsMu.Unlock()
 
-	// 后台执行
 	go runBatch(req, emailProvider, outlookAccounts, httpAPIAccounts)
 
 	return map[string]interface{}{"status": "started"}
@@ -190,12 +253,25 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 
 	Manager.mu.Lock()
 	Manager.cancelFunc = taskCancel
+	wakeCh := Manager.wakeCh
 	Manager.mu.Unlock()
+	if wakeCh == nil {
+		wakeCh = make(chan struct{}, 1)
+		Manager.mu.Lock()
+		Manager.wakeCh = wakeCh
+		Manager.mu.Unlock()
+	}
 
 	defer func() {
 		Manager.mu.Lock()
-		Manager.running = false
-		Manager.cancelFunc = nil
+		if Manager.wakeCh == wakeCh {
+			Manager.wakeCh = nil
+			Manager.provider = ""
+			Manager.reserved = nil
+			Manager.extra = nil
+			Manager.running = false
+			Manager.cancelFunc = nil
+		}
 		Manager.mu.Unlock()
 	}()
 
@@ -321,6 +397,13 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		}
 		return "", email.CloudMailConfig{}
 	}
+	totalN := func() int {
+		Manager.mu.Lock()
+		n := Manager.total
+		Manager.mu.Unlock()
+		return n
+	}
+
 	doTask := func(i int) {
 		select {
 		case <-Manager.stopCh:
@@ -333,7 +416,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		// 多代理池：若存在启用项，按权重抽签覆盖单代理
 		if picked := proxy.PickRandom(); picked != "" {
 			taskCfg.Proxy = picked
-			log.Printf("[Kiro][%d/%d] 选中代理 %s", i+1, req.Count, picked)
+			log.Printf("[Kiro][%d/%d] 选中代理 %s", i+1, totalN(), picked)
 		}
 		var currentEmail string
 
@@ -346,7 +429,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 			// Outlook 模式：从共享池领取账号
 			acc, ok := nextAccount()
 			if !ok {
-				log.Printf("[Kiro][%d/%d] 无可用账号，跳过", i+1, req.Count)
+				log.Printf("[Kiro][%d/%d] 无可用账号，跳过", i+1, totalN())
 				Manager.mu.Lock()
 				Manager.completed++
 				Manager.failed++
@@ -358,7 +441,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		} else if emailProvider == "httpapi" {
 			acc, ok := nextHttpAPIAccount()
 			if !ok {
-				log.Printf("[Kiro][%d/%d] 无可用 HTTP 邮箱，跳过", i+1, req.Count)
+				log.Printf("[Kiro][%d/%d] 无可用 HTTP 邮箱，跳过", i+1, totalN())
 				Manager.mu.Lock()
 				Manager.completed++
 				Manager.failed++
@@ -377,11 +460,11 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 				emailName := email.GenerateEmailName(i)
 				currentDomain = domain
 
-				log.Printf("[Kiro][%d/%d] 创建 cloud-mail 邮箱: %s@%s (配置: %s)", i+1, req.Count, emailName, domain, config.Name)
+				log.Printf("[Kiro][%d/%d] 创建 cloud-mail 邮箱: %s@%s (配置: %s)", i+1, totalN(), emailName, domain, config.Name)
 
 				provider, err := email.NewCloudMailProvider(config, emailName, domain)
 				if err != nil {
-					log.Printf("[Kiro][%d/%d] 生成 cloud-mail 邮箱失败: %v", i+1, req.Count, err)
+					log.Printf("[Kiro][%d/%d] 生成 cloud-mail 邮箱失败: %v", i+1, totalN(), err)
 					return "", false
 				}
 
@@ -402,7 +485,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 			}
 		}
 
-		log.Printf("[Kiro][%d/%d] 开始注册", i+1, req.Count)
+		log.Printf("[Kiro][%d/%d] 开始注册", i+1, totalN())
 		itemStart := time.Now()
 
 		const maxAttempts = 2
@@ -421,7 +504,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 			}
 
 			if attempt > 0 {
-				log.Printf("[Kiro][%d/%d] 第 %d 次重试", i+1, req.Count, attempt)
+				log.Printf("[Kiro][%d/%d] 第 %d 次重试", i+1, totalN(), attempt)
 				select {
 				case <-Manager.stopCh:
 					return
@@ -435,7 +518,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 
 			reg := core.NewRegistrar(&taskCfg)
 			reg.Ctx = taskCtx
-			reg.TaskLabel = fmt.Sprintf("%d/%d", i+1, req.Count)
+			reg.TaskLabel = fmt.Sprintf("%d/%d", i+1, totalN())
 			result = reg.Run()
 
 			if result["status"] == "success" {
@@ -455,16 +538,16 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 				email.MarkDomainBanned(currentDomain)
 
 				log.Printf("[Kiro][%d/%d] ⚠️ 邮箱域名 %s 被 TES 拉黑，已标记 (%d/%d 域名被封)",
-					i+1, req.Count, currentDomain, bannedCount, len(cloudmailDomainPool))
+					i+1, totalN(), currentDomain, bannedCount, len(cloudmailDomainPool))
 
 				newEmail, ok := newCloudMailMailbox()
 				if !ok {
-					log.Printf("[Kiro][%d/%d] 所有域名均被拉黑，放弃重试", i+1, req.Count)
+					log.Printf("[Kiro][%d/%d] 所有域名均被拉黑，放弃重试", i+1, totalN())
 					break
 				}
 				currentEmail = newEmail
 				attempt = -1 // 换域名：重置重试预算
-				log.Printf("[Kiro][%d/%d] 换域名重试: %s", i+1, req.Count, currentEmail)
+				log.Printf("[Kiro][%d/%d] 换域名重试: %s", i+1, totalN(), currentEmail)
 				continue retryLoop
 			}
 
@@ -477,7 +560,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 				bannedProxiesMu.Unlock()
 
 				log.Printf("[Kiro][%d/%d] ⚠️ 代理 %s 被 AWS 风控拦截，已标记 (%d/%d 代理被封)",
-					i+1, req.Count, taskCfg.Proxy, bannedCount, proxy.CountEnabled())
+					i+1, totalN(), taskCfg.Proxy, bannedCount, proxy.CountEnabled())
 
 				// 尝试换代理重试
 				var newProxy string
@@ -500,17 +583,17 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 					taskCfg.Proxy = newProxy
 					attempt-- // 代理切换不消耗常规重试预算
 					log.Printf("[Kiro][%d/%d] 换代理 %s 重试 (代理切换 %d/%d)",
-						i+1, req.Count, newProxy, proxySwitches, maxProxySwitches)
+						i+1, totalN(), newProxy, proxySwitches, maxProxySwitches)
 					continue retryLoop
 				}
 
-				log.Printf("[Kiro][%d/%d] 无可用代理（全部被封），放弃重试", i+1, req.Count)
+				log.Printf("[Kiro][%d/%d] 无可用代理（全部被封），放弃重试", i+1, totalN())
 				break
 			}
 
 			// 邮箱已注册：标记当前账号，换号重来（重置 attempt）
 			if (taskConfig.UseOutlook || taskConfig.UseHttpAPI) && strings.Contains(errorMsg, "邮箱已注册过") {
-				log.Printf("[Kiro][%d/%d] %s 已注册，标记并换号", i+1, req.Count, currentEmail)
+				log.Printf("[Kiro][%d/%d] %s 已注册，标记并换号", i+1, totalN(), currentEmail)
 				if taskConfig.UseOutlook {
 					email.UpdateAccountStatus(currentEmail, true, false)
 					acc, ok := nextAccount()
@@ -532,13 +615,13 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 						continue retryLoop
 					}
 				}
-				log.Printf("[Kiro][%d/%d] 账号池已耗尽", i+1, req.Count)
+				log.Printf("[Kiro][%d/%d] 账号池已耗尽", i+1, totalN())
 				break
 			}
 
 			// Point of no return：Step12 已完成但整体失败 → 邮箱已消耗，不换代理重试
 			if pwSet, _ := result["passwordSet"].(bool); pwSet {
-				log.Printf("[Kiro][%d/%d] 密码已设置但验活失败，邮箱已消耗，不再重试", i+1, req.Count)
+				log.Printf("[Kiro][%d/%d] 密码已设置但验活失败，邮箱已消耗，不再重试", i+1, totalN())
 				break
 			}
 
@@ -556,7 +639,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 				break
 			}
 
-			log.Printf("[Kiro][%d/%d] 注册失败: %s，准备重试", i+1, req.Count, errorMsg)
+			log.Printf("[Kiro][%d/%d] 注册失败: %s，准备重试", i+1, totalN(), errorMsg)
 		}
 
 		itemDuration := time.Since(itemStart).Seconds()
@@ -598,7 +681,7 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		// log.Printf 必须在 state.mu 外调用，否则与 logWriter 死锁
 		if !success {
 			if errMsg, ok := result["error"].(string); ok {
-				log.Printf("[Kiro][%d/%d] 失败: %s (%s)", completedCount, req.Count, errMsg, currentEmail)
+				log.Printf("[Kiro][%d/%d] 失败: %s (%s)", completedCount, totalN(), errMsg, currentEmail)
 			}
 		}
 
@@ -640,44 +723,142 @@ func runBatch(req StartTaskRequest, emailProvider string, outlookAccounts []emai
 		}
 	}
 
+	nextIdx := 0
+	notifyWake := func() {
+		select {
+		case wakeCh <- struct{}{}:
+		default:
+		}
+	}
+	applyExtra := func(extras []extraBatch) {
+		if len(extras) == 0 {
+			return
+		}
+		accountPoolMu.Lock()
+		for _, e := range extras {
+			outlookAccounts = append(outlookAccounts, e.outlook...)
+			httpAPIAccounts = append(httpAPIAccounts, e.httpapi...)
+		}
+		accountPoolMu.Unlock()
+	}
+	drainExtra := func() {
+		Manager.mu.Lock()
+		extras := Manager.extra
+		Manager.extra = nil
+		Manager.mu.Unlock()
+		applyExtra(extras)
+	}
+	// tryFinish 在「已发完且无在途」时关闭追加窗口，避免 summary 阶段吞掉刚追加的任务。
+	tryFinish := func() bool {
+		Manager.mu.Lock()
+		extras := Manager.extra
+		Manager.extra = nil
+		target := Manager.total
+		if nextIdx >= target && len(extras) == 0 {
+			Manager.running = false
+			Manager.mu.Unlock()
+			return true
+		}
+		Manager.mu.Unlock()
+		applyExtra(extras)
+		return false
+	}
+	stopped := func() bool {
+		select {
+		case <-Manager.stopCh:
+			return true
+		default:
+			return false
+		}
+	}
+	sleepOrStop := func(d time.Duration) bool {
+		if d <= 0 {
+			return false
+		}
+		t := time.NewTimer(d)
+		defer t.Stop()
+		select {
+		case <-Manager.stopCh:
+			return true
+		case <-t.C:
+			return false
+		}
+	}
+	waitStopOrWake := func() bool {
+		select {
+		case <-Manager.stopCh:
+			return true
+		case <-wakeCh:
+			return false
+		}
+	}
+
 	if req.Concurrency > 1 {
-		log.Printf("[Kiro] 启动并发任务: %d 个任务，并发数 %d，延时 %d 秒", req.Count, req.Concurrency, req.Delay)
+		log.Printf("[Kiro] 启动并发任务: %d 个任务，并发数 %d，延时 %.1f 秒", req.Count, req.Concurrency, req.Delay)
 		sem := make(chan struct{}, req.Concurrency)
 		var wg sync.WaitGroup
-	loop:
-		for i := 0; i < req.Count; i++ {
-			select {
-			case <-Manager.stopCh:
-				break loop
-			default:
+		var inFlight int64
+	concLoop:
+		for {
+			if stopped() {
+				break concLoop
 			}
-
-			// 并发模式下的账号间延时（在启动任务前延时）
-			if req.Delay > 0 && i > 0 {
-				time.Sleep(time.Duration(req.Delay) * time.Second)
+			drainExtra()
+			target := totalN()
+			if nextIdx < target {
+				if req.Delay > 0 && nextIdx > 0 {
+					if sleepOrStop(time.Duration(req.Delay) * time.Second) {
+						break concLoop
+					}
+					if stopped() {
+						break concLoop
+					}
+				}
+				idx := nextIdx
+				nextIdx++
+				wg.Add(1)
+				atomic.AddInt64(&inFlight, 1)
+				sem <- struct{}{}
+				go func(i int) {
+					defer wg.Done()
+					defer func() { <-sem }()
+					defer func() {
+						atomic.AddInt64(&inFlight, -1)
+						notifyWake()
+					}()
+					doTask(i)
+				}(idx)
+				continue
 			}
-
-			wg.Add(1)
-			sem <- struct{}{}
-			go func(idx int) {
-				defer wg.Done()
-				defer func() { <-sem }()
-				doTask(idx)
-			}(i)
+			if atomic.LoadInt64(&inFlight) == 0 {
+				if tryFinish() {
+					break concLoop
+				}
+				continue
+			}
+			if waitStopOrWake() {
+				break concLoop
+			}
 		}
 		wg.Wait()
 	} else {
-		log.Printf("[Kiro] 启动串行任务: %d 个任务，延时 %d 秒", req.Count, req.Delay)
-		for i := 0; i < req.Count; i++ {
-			select {
-			case <-Manager.stopCh:
+		log.Printf("[Kiro] 启动串行任务: %d 个任务，延时 %.1f 秒", req.Count, req.Delay)
+	serialLoop:
+		for {
+			if stopped() {
 				log.Println("任务已停止")
 				return
-			default:
 			}
-			doTask(i)
-			if req.Delay > 0 && i < req.Count-1 {
-				time.Sleep(time.Duration(req.Delay) * time.Second)
+			if tryFinish() {
+				break serialLoop
+			}
+			doTask(nextIdx)
+			nextIdx++
+			if req.Delay > 0 && nextIdx < totalN() {
+				if sleepOrStop(time.Duration(req.Delay) * time.Second) {
+					log.Println("任务已停止")
+					return
+				}
 			}
 		}
 	}

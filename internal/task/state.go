@@ -4,7 +4,15 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	"reg_go/internal/email"
 )
+
+// extraBatch 运行中追加的一批任务（账号已预留，避免与进行中的任务重复领取）
+type extraBatch struct {
+	outlook []email.OutlookAccount
+	httpapi []email.HttpAPIAccount
+}
 
 // State 任务状态（从原 App 脱离为独立单例）
 type State struct {
@@ -20,6 +28,11 @@ type State struct {
 	startTime  time.Time
 	logs       []string
 	logsMu     sync.Mutex
+
+	provider string          // 当前批次邮箱类型，追加时必须一致
+	reserved map[string]bool // 本批次已预留的邮箱，追加时跳过
+	extra    []extraBatch    // 待调度的追加账号
+	wakeCh   chan struct{}   // 唤醒调度器（追加任务 / 任务完成）
 }
 
 var Manager = &State{

@@ -159,11 +159,7 @@ func (s *Server) HandleRegisterStop(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	success := task.StopTask(true)
-	result := map[string]interface{}{
-		"success": success,
-		"message": "Task stopped",
-	}
+	result := task.StopTask(true)
 
 	s.respondJSON(w, result)
 
