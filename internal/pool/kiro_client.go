@@ -344,7 +344,7 @@ func availableModelsURL(region, profileArn string) string {
 		qUsageEndpoint(region), url.QueryEscape(usageQueryProfileArn(profileArn)))
 }
 
-func (c *KiroClient) GetAvailableModels(account *Account, accessToken string) []string {
+func (c *KiroClient) GetAvailableModels(account *Account, accessToken string) ([]string, int) {
 	fallback := []string{
 		"claude-opus-4.8",
 		"claude-opus-4.7",
@@ -358,7 +358,7 @@ func (c *KiroClient) GetAvailableModels(account *Account, accessToken string) []
 		"MiniMax-M2.5",
 	}
 	if accessToken == "" {
-		return fallback
+		return fallback, 0
 	}
 	arn := ""
 	if account != nil {
@@ -377,11 +377,18 @@ func (c *KiroClient) GetAvailableModels(account *Account, accessToken string) []
 		if err != nil {
 			continue
 		}
+		statusCode := resp.StatusCode
 		body, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		if resp.StatusCode != 200 {
+
+		// 403 判死
+		if statusCode == 403 {
+			return nil, 403
+		}
+		if statusCode != 200 {
 			continue
 		}
+
 		var data map[string]interface{}
 		if json.Unmarshal(body, &data) != nil {
 			continue
@@ -402,19 +409,20 @@ func (c *KiroClient) GetAvailableModels(account *Account, accessToken string) []
 			}
 		}
 		if len(out) > 0 {
-			return out
+			return out, 200
 		}
 	}
-	return fallback
+	return fallback, 0
 }
 
 // UpdateAccountInfo 更新账号运行时信息（健康状态、额度、模型）
 // 从 GetUsageLimits 解析出 CreditUsed/CreditLimit，供无感轮询决策。
+// 增强验活：403 判死（参考 core.VerifyAlive）
 func (c *KiroClient) UpdateAccountInfo(account *Account) error {
 	now := time.Now().Format(time.RFC3339)
 
-	// 1. 健康检测
-	err := c.CheckHealth(account)
+	// 1. 刷新 access token（同时作为健康检测）
+	accessToken, err := c.RefreshAccessToken(account)
 	if err != nil {
 		status, code := classifyHealthError(err)
 		account.HealthStatus = status
@@ -422,6 +430,12 @@ func (c *KiroClient) UpdateAccountInfo(account *Account) error {
 		account.HealthError = err.Error()
 		account.HealthCheckedAt = now
 		account.LastUpdatedAt = now
+
+		// Token 刷新 401/403 → 账号吊销/封禁，判死
+		if code == "AUTH" {
+			account.HealthStatus = "suspended"
+			account.HealthError = "Token 已吊销或账号已封禁 (401/403)"
+		}
 		return err
 	}
 
@@ -430,20 +444,18 @@ func (c *KiroClient) UpdateAccountInfo(account *Account) error {
 	account.HealthError = ""
 	account.HealthCheckedAt = now
 
-	// 2. 刷新 access token 用于查询额度
-	accessToken, err := c.RefreshAccessToken(account)
-	if err != nil {
-		status, code := classifyHealthError(err)
-		account.HealthStatus = status
-		account.HealthCode = code
-		account.HealthError = fmt.Sprintf("refresh token failed: %v", err)
-		account.LastUpdatedAt = now
-		return err
-	}
-
-	// 3. 查询额度
+	// 2. 查询额度（403 判死）
 	usage, err := c.GetUsage(account, accessToken)
 	if err != nil {
+		// 检查是否是 403 封号信号
+		if strings.Contains(err.Error(), "HTTP 403") {
+			account.HealthStatus = "suspended"
+			account.HealthCode = "AUTH"
+			account.HealthError = "Q 端点 403，账号已封禁"
+			account.LastUpdatedAt = now
+			return fmt.Errorf("account suspended: Q endpoint 403")
+		}
+
 		// 额度查询失败不算健康问题，可能是 API 限制
 		account.UsageQuotas = map[string]interface{}{
 			"error": err.Error(),
@@ -471,8 +483,16 @@ func (c *KiroClient) UpdateAccountInfo(account *Account) error {
 		}
 	}
 
-	// 4. 获取可用模型
-	account.AvailableModels = c.GetAvailableModels(account, accessToken)
+	// 3. 获取可用模型（403 判死）
+	models, modelStatus := c.GetAvailableModels(account, accessToken)
+	if modelStatus == 403 {
+		account.HealthStatus = "suspended"
+		account.HealthCode = "AUTH"
+		account.HealthError = "ListAvailableModels 403，账号已封禁"
+		account.LastUpdatedAt = now
+		return fmt.Errorf("account suspended: models endpoint 403")
+	}
+	account.AvailableModels = models
 
 	account.LastUpdatedAt = now
 	return nil
