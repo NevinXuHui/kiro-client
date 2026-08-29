@@ -28,21 +28,23 @@ show_help() {
 用法: $0 [选项]
 
 选项:
-  -h HOST        指定监听地址 (默认: 0.0.0.0)
-  -p PORT        指定监听端口 (默认: 9702)
+  -h, --help     显示此帮助信息
+  -H, --host     指定监听地址 (默认: 0.0.0.0)
+  -p, --port     指定监听端口 (默认: 9702；被占用则自动 +1)
   -b, --build    强制重新编译
   -s, --skip     跳过编译，直接运行
-  --help         显示此帮助信息
 
 示例:
   $0                          # 使用默认配置运行
-  $0 -h 0.0.0.0 -p 9702       # 监听所有网卡，端口 9702
+  $0 -H 0.0.0.0 -p 9702       # 监听所有网卡，端口 9702
+  $0 -p 9703                  # 指定端口（9702 被占用时用这个）
   $0 -b                       # 强制重新编译后运行
-  $0 -s -h 0.0.0.0            # 跳过编译，使用现有二进制文件
+  $0 -s                       # 跳过编译，使用现有二进制文件
 
 说明:
   - 默认会检查二进制文件是否存在，不存在则自动编译
   - 检查源文件是否有更新，有更新则自动重新编译
+  - 端口被 kiro-web 占用时先停掉旧进程；被其他程序占用则自动换下一个端口
   - 使用 -b 选项可以强制重新编译
   - 使用 -s 选项可以跳过编译检查
 
@@ -53,11 +55,15 @@ HELP
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do
     case $1 in
-        -h)
+        -h|--help)
+            show_help
+            exit 0
+            ;;
+        -H|--host)
             HOST="$2"
             shift 2
             ;;
-        -p)
+        -p|--port)
             PORT="$2"
             shift 2
             ;;
@@ -68,10 +74,6 @@ while [[ $# -gt 0 ]]; do
         -s|--skip)
             SKIP_BUILD=true
             shift
-            ;;
-        --help)
-            show_help
-            exit 0
             ;;
         *)
             echo -e "${RED}❌ 未知选项: $1${NC}"
@@ -151,6 +153,40 @@ if [ "$NEED_BUILD" = true ]; then
     echo ""
 fi
 
+# 端口被旧实例占用时先停掉；被其他程序占用则自动换端口
+port_in_use() {
+    lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+OLD_PIDS=$(pgrep -x kiro-web 2>/dev/null || true)
+if [ -n "$OLD_PIDS" ]; then
+    echo -e "${YELLOW}⚠️  检测到已有 kiro-web 进程 (PID: $OLD_PIDS)，正在停止...${NC}"
+    kill $OLD_PIDS 2>/dev/null || true
+    sleep 1
+    STILL=$(pgrep -x kiro-web 2>/dev/null || true)
+    if [ -n "$STILL" ]; then
+        kill -9 $STILL 2>/dev/null || true
+        sleep 1
+    fi
+fi
+
+ORIG_PORT="$PORT"
+TRIES=0
+while port_in_use "$PORT"; do
+    TRIES=$((TRIES + 1))
+    if [ "$TRIES" -gt 20 ]; then
+        echo -e "${RED}❌ 从 $ORIG_PORT 起连续 20 个端口都被占用${NC}"
+        exit 1
+    fi
+    NEXT=$((PORT + 1))
+    echo -e "${YELLOW}⚠️  端口 $PORT 已被占用，自动切换到 $NEXT${NC}"
+    PORT="$NEXT"
+done
+if [ "$PORT" != "$ORIG_PORT" ]; then
+    echo -e "${GREEN}✅ 使用端口 $PORT（请用 http://127.0.0.1:$PORT 访问）${NC}"
+    echo ""
+fi
+
 # 显示运行配置
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}🎯 运行配置${NC}"
@@ -182,19 +218,6 @@ echo ""
 echo -e "${GREEN}🚀 启动服务器...${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-
-# 端口被旧实例占用时先停掉，避免 bind: address already in use
-OLD_PIDS=$(pgrep -x kiro-web 2>/dev/null || true)
-if [ -n "$OLD_PIDS" ]; then
-    echo -e "${YELLOW}⚠️  检测到已有 kiro-web 进程 (PID: $OLD_PIDS)，正在停止...${NC}"
-    kill $OLD_PIDS 2>/dev/null || true
-    sleep 1
-    STILL=$(pgrep -x kiro-web 2>/dev/null || true)
-    if [ -n "$STILL" ]; then
-        kill -9 $STILL 2>/dev/null || true
-        sleep 1
-    fi
-fi
 
 # 设置信号处理
 trap 'echo ""; echo -e "${YELLOW}🛑 正在停止服务器...${NC}"; kill $SERVER_PID 2>/dev/null; wait $SERVER_PID 2>/dev/null; echo -e "${GREEN}✅ 服务器已停止${NC}"; exit 0' INT TERM
