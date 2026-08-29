@@ -1,0 +1,68 @@
+internal/pool/verify.go
+  52a05bc341379ecd 1-355
+test_import_verify.sh
+  52a05bc341379ecd 1-38
+internal/web/server.go
+  52a05bc341379ecd 493-496,512-554,572-576,580,584-585,589-592,600-606
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "5bccbdd373941c874790a0b2480be1dfdb7070f7",
+  "prompts": {
+    "52a05bc341379ecd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "768ad663-0592-4822-9170-2773d4a82146",
+        "model": "grok-4.6"
+      },
+      "human_author": "XuHui <xuhui@XuHuideMac-mini.local>",
+      "messages": [],
+      "total_additions": 466,
+      "total_deletions": 8,
+      "accepted_lines": 462,
+      "overriden_lines": 0
+    }
+  },
+  "commit_stats": {
+    "git_diff_added_lines": 462,
+    "git_diff_deleted_lines": 4,
+    "ai_additions": 459,
+    "ai_accepted": 459,
+    "BYMC": 0,
+    "mixed_additions": 0,
+    "BYAC": 459,
+    "BYRC": 0,
+    "per_file": {
+      "internal/pool/verify.go": {
+        "BYMC": [],
+        "BYAC": [
+          "1-355"
+        ],
+        "BYRC": []
+      },
+      "internal/web/server.go": {
+        "BYMC": [],
+        "BYAC": [
+          "493-496",
+          "512-554",
+          "572-576",
+          "580",
+          "584-585",
+          "589-592",
+          "600-606"
+        ],
+        "BYRC": []
+      },
+      "test_import_verify.sh": {
+        "BYMC": [],
+        "BYAC": [
+          "1-38"
+        ],
+        "BYRC": []
+      }
+    }
+  },
+  "commit_timestamp": 1787963380,
+  "requirement_id": ""
+}
